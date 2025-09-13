@@ -1,0 +1,130 @@
+#!/usr/bin/env -S bundle exec ruby
+# -*-ruby-*-
+
+require 'socket'
+require 'ninep'
+
+if $0 == __FILE__
+require 'optparse'
+
+$verbose = false
+host = 'localhost'
+port = 564
+uid = 0
+uname = ''
+aname = '/'
+
+def vputs(*)
+  return unless $verbose
+  puts(*)
+end
+
+opts = OptionParser.new do |o|
+  o.on('-v', '--verbose') do
+    $verbose = true
+  end
+  o.on('-u', '--uname NAME') do |v|
+    uname = v
+  end
+  o.on('--uid INTEGER') do |v|
+    uid = v.to_i
+  end
+  o.on('-e', '--aname NAME') do |v|
+    aname = v
+  end
+end
+
+paths = opts.parse(ARGV)
+paths << '' if paths.empty?
+
+sock = TCPSocket.new(host, port)
+client = NineP::Client.new(coder: NineP::L2000::Decoder.new,
+                           io: sock)
+
+Signal.trap('INT') do
+  client.close
+end
+Signal.trap('QUIT') do
+  client.close
+end
+
+client.send_one(NineP::Packet.new(tag: -1, data: NineP::Tversion.new(msize: 65535, version: NineP::NString.new('9P2000.L'))))
+vputs(client.read_one.tap { _1.data }.inspect)
+if uid
+  client.send_one(NineP::Packet.new(tag: 0,
+    data: NineP::L2000::Tauth.new(
+      afid: 0,
+      uname: NineP::NString.new(uname),
+      aname: NineP::NString.new(aname),
+      n_uname: uid)))
+  reply = client.read_one
+  vputs(reply.tap { _1.data }.inspect)
+  #exit(-1) if NineP::Rerror === reply.data
+end
+afid = reply.data.afid unless NineP::Rerror === reply.data
+client.send_one(NineP::Packet.new(tag: 0,
+  data: NineP::L2000::Tattach.new(
+    fid: 0,
+    afid: afid || -1,
+    uname: NineP::NString.new(uname),
+    aname: NineP::NString.new(aname),
+    n_uname: uid || -1)))
+reply = client.read_one
+vputs(reply.tap { _1.data }.inspect)
+qid = reply.data.aqid if NineP::Rattach === reply.data
+
+client.send_one(NineP::Packet.new(tag: 1,
+  data: NineP::Twalk.new(
+    fid: 0,
+    newfid: 1,
+    wnames: [ NineP::NString.new('/') ])))
+vputs(client.read_one.tap { _1.data }.inspect)
+client.send_one(NineP::Packet.new(tag: 3,
+  data: NineP::Tclunk.new(fid: 1)))
+vputs(client.read_one.tap { _1.data }.inspect)
+
+paths.each do |path|
+  client.send_one(NineP::Packet.new(tag: 2,
+    data: NineP::Twalk.new(
+      fid: 0,
+      newfid: 2,
+      wnames: path.empty?? [] : path.split('/').collect { NineP::NString.new(_1) })))
+  pkt = client.read_one
+  vputs(pkt.tap { _1.data }.inspect)
+
+  client.send_one(NineP::Packet.new(tag: 2,
+    data: NineP::L2000::Topen.new(
+      fid: 2,
+      flags: 00200000)))
+  pkt = client.read_one
+  vputs(pkt.tap { _1.data }.inspect)
+
+  unless NineP::Rerror === reply.data
+    offset = 0
+    puts("\e[1m%s\e[0m" % [ path.empty?? '/' : path ])
+    begin
+      client.send_one(NineP::Packet.new(tag: 2,
+        data: NineP::L2000::Treaddir.new(
+          fid: 2,
+          offset: offset,
+          count: 256)))
+      pkt = client.read_one
+      vputs(pkt.tap { _1.data }.inspect)
+      ents = pkt.data.entries
+      ents.each do |ent|
+        puts("  \e[1m%s\e[0m" % [ ent.name.to_s ])
+      end
+      offset += ents.size
+    end until pkt.data.count == 0
+
+    client.send_one(NineP::Packet.new(tag: 3,
+      data: NineP::Tclunk.new(fid: 2)))
+    vputs(client.read_one.tap { _1.data }.inspect)
+  end
+end
+
+client.send_one(NineP::Packet.new(tag: 3,
+  data: NineP::Tclunk.new(fid: 0)))
+vputs(client.read_one.tap { _1.data }.inspect)
+client.close
+end
