@@ -33,10 +33,7 @@ module NineP
                    [:tag, :uint16l],
                    [:raw_data, :string, :data_size])
     
-    attr_accessor :coder
-    attr_accessor :size, :type, :tag, :raw_data, :data, :extra_data
-    
-    attributes :coder, :data
+    attributes :coder, :data, :extra_data
     
     def size
       @size || (attribute_offset(:raw_data) + data.bytesize)
@@ -132,10 +129,9 @@ module NineP
   class NString
     include SG::AttrStruct
     include SG::PackedStruct
-    define_packing([:size, :uint16l], [:value, :string, :size])
+    define_packing([:size, :uint16l],
+                   [:value, :string, :size])
 
-    attr_accessor :value
-    
     def initialize *opts
       case opts
         in [] then @size = 0
@@ -159,9 +155,9 @@ module NineP
   class Qid
     include SG::AttrStruct
     include SG::PackedStruct
-    define_packing([:type, :uint8], [:version, :uint32l], [:path, :string, 8])
-
-    attr_accessor :type, :version, :path
+    define_packing([:type, :uint8],
+                   [:version, :uint32l],
+                   [:path, :string, 8])
   end
       
   class Tversion
@@ -169,8 +165,6 @@ module NineP
     include Packet::Data
     define_packing([:msize, :uint32l],
                    [:version, NString])
-    
-    attr_accessor :msize, :version_size, :version
   end
 
   class Rversion < Tversion
@@ -184,24 +178,18 @@ module NineP
                    [:afid, :uint32l],
                    [:uname, NString],
                    [:aname, NString])
-    
-    attr_accessor :fid, :afid, :uname, :aname    
   end
 
   class Rattach
     ID = 105
     include Packet::Data
     define_packing([:aqid, Qid])
-    
-    attr_accessor :aqid
   end
 
   class Rerror
     ID = 7
     include Packet::Data
     define_packing([:code, :uint32l])
-    
-    attr_accessor :code
   end
   
   class Tauth
@@ -210,24 +198,18 @@ module NineP
     define_packing([:afid, :uint32l],
                    [:uname, NString],
                    [:aname, NString])
-    
-    attr_accessor :afid, :uname, :aname, :n_uname
   end
   
   class Rauth
     ID = 103
     include Packet::Data
     define_packing([:aqid, Qid])
-    
-    attr_accessor :aqid
   end
 
   class Tclunk
     ID = 120
     include Packet::Data
     define_packing([:fid, :uint32l])
-    
-    attr_accessor :fid
   end
 
   class Rclunk
@@ -245,8 +227,6 @@ module NineP
                    [:nwnames, :uint16l],
                    [:wnames, NString, :nwnames])
     
-    attr_accessor :fid, :newfid, :nwnames, :wnames
-    
     def pack
       self.nwnames = wnames.size
       super
@@ -258,9 +238,7 @@ module NineP
     ID = 111
     include Packet::Data
     define_packing([:nwqid, :uint16l],
-                   [:wqid, Qid, :nwqid]) # todo many
-    
-    attr_accessor :nwqid, :wqid
+                   [:wqid, Qid, :nwqid])
     
     def pack
       self.nwqid = wqid.size
@@ -310,8 +288,6 @@ module NineP
                      [:uname, NString],
                      [:aname, NString],
                      [:n_uname, :uint32l]) # 9p2000.L only
-    
-      attr_accessor :afid, :uname, :aname, :n_uname
     end
   
     class Tattach
@@ -322,42 +298,31 @@ module NineP
                      [:uname, NString],
                      [:aname, NString],
                      [:n_uname, :uint32l])
-    
-      attr_accessor :fid, :afid, :uname, :aname, :n_uname
     end
 
     class Topen
       # size[4] Tlopen tag[2] fid[4] flags[4]
-      # size[4] Rlopen tag[2] qid[13] iounit[4]
       ID = 12
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:flags, :uint32l])
-    
-      attr_accessor :fid, :flags
     end
 
     class Ropen
-      # size[4] Tlopen tag[2] fid[4] flags[4]
       # size[4] Rlopen tag[2] qid[13] iounit[4]
       ID = 13
       include Packet::Data
       define_packing([:qid, Qid],
                      [:iounit, :uint32l])
-    
-      attr_accessor :qid, :iounit
     end
 
     class Treaddir
       # size[4] Treaddir tag[2] fid[4] offset[8] count[4]
-      # size[4] Rreaddir tag[2] count[4] data[count]
       ID = 40
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:offset, :uint64l],
                      [:count, :uint32l])
-    
-      attr_accessor :fid, :offset, :count
     end
 
     class Rreaddir
@@ -369,18 +334,13 @@ module NineP
                        [:offset, :uint64l],
                        [:type, :uint8],
                        [:name, NString])
-    
-        attr_accessor :qid, :offset, :type, :name
       end
-      # size[4] Treaddir tag[2] fid[4] offset[8] count[4]
       # size[4] Rreaddir tag[2] count[4] data[count]
       ID = 41
       include Packet::Data
       define_packing([:count, :uint32l],
                      [:data, :string, :count])
     
-      attr_accessor :count, :data
-      
       def entries
         ents = []
         d = data
