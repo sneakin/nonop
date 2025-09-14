@@ -28,7 +28,7 @@ describe NineP::Decoder do
   let(:client_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '>' }.collect { _1[2] }.join }
   let(:server_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '<' }.collect { _1[2] }.join }
 
-  subject { described_class.new(coders: NineP::RequestReplies.flatten.reject(&:nil?)) }
+  subject { described_class.new(coders: NineP::Decoder::RequestReplies.flatten.reject(&:nil?)) }
 
   it 'decodes all the client data' do
     $stderr.puts("client")
