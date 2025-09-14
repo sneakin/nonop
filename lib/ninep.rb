@@ -14,7 +14,8 @@ module NineP
         base.include SG::PackedStruct
         base.extend(ClassMethods)
       end
-      
+
+      # todo only the Coder knows about registered IDs
       module ClassMethods
         def type_id
           self.const_get('ID')
@@ -73,9 +74,20 @@ module NineP
       end
     end
     
-    attr_reader :packet_types
+    class InvalidSize < RuntimeError
+      include SG::AttrStruct
+      attributes :size, :max_msglen
+      
+      def message
+        "Decode error: #{size || '---'} is not between 0 and #{max_msglen || '---'}"
+      end
+    end
     
-    def initialize coders: nil
+    attr_reader :packet_types
+    attr_accessor :max_msglen
+    
+    def initialize coders: nil, max_msglen: 65536
+      @max_msglen = max_msglen
       @packet_types = Hash.new(NopDecoder)
       add_packet_types(coders) unless coders&.empty?
     end
@@ -92,15 +104,22 @@ module NineP
       io.write(data)
     end
     
-    def read_one io    
-      pktsize = io.read(4)
-      len = pktsize.unpack('L<').first
-      $stderr.write("< #{len} ") if $verbose
-      data = io.read(len - 4)
-      $stderr.write(data.inspect) if $verbose
-      pkt, more = unpack(pktsize + data)
-      raise DecodeError.new(len, pkt, more) unless more.empty?
+    def read_one io
+      # todo any real need for Packet? Which of these is faster?
+      pkt, more = Packet.read(io)
+      raise DecodeError.new(-1, pkt, more) unless more.blank?
+      pkt.coder = packet_types[pkt.type]
       pkt
+
+      # pktsize = io.read(4)
+      # len = pktsize.unpack('L<').first
+      # raise InvalidSize.new(len, max_msglen) if len === 0..max_msglen # todo off by 1?
+      # $stderr.write("< #{len} ") if $verbose
+      # data = io.read(len - 4)
+      # $stderr.write(data.inspect) if $verbose
+      # pkt, more = unpack(pktsize + data)
+      # raise DecodeError.new(len, pkt, more) unless more.blank?
+      # pkt
     end
 
     def unpack str
@@ -278,6 +297,8 @@ module NineP
     def closed?
       @io.closed?
     end
+
+    delegate :max_msglen, :max_msglen=, to: :coder
   end
 
   module L2000
