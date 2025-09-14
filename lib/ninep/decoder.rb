@@ -10,11 +10,14 @@ require_relative 'messages/attach'
 require_relative 'messages/auth'
 require_relative 'messages/walk'
 require_relative 'messages/clunk'
+require_relative 'messages/remove'
+require_relative 'messages/stat'
 
 require_relative 'messages/2000L/auth'
 require_relative 'messages/2000L/attach'
 require_relative 'messages/2000L/open'
 require_relative 'messages/2000L/readdir'
+require_relative 'messages/2000L/getattr'
 
 module NineP
   class Decoder
@@ -23,7 +26,10 @@ module NineP
                        [ nil, Rerror ],
                        [ Tauth, Rauth ],
                        [ Tclunk, Rclunk ],
-                       [ Twalk, Rwalk ] ]
+                       [ Twalk, Rwalk ],
+                       [ Tremove, Rremove ],
+                       [ Tstat, Rstat ],
+                     ]
 
     class DecodeError < RuntimeError
       include SG::AttrStruct
@@ -113,8 +119,12 @@ module NineP
                        [ Tauth, Rauth ],
                        [ Tclunk, Rclunk ],
                        [ Twalk, Rwalk ],
+                       [ Tremove, Rremove ],
+                       [ Tstat, Rstat ],
                        [ Topen, Ropen ],
-                       [ Treaddir, Rreaddir ] ]
+                       [ Treaddir, Rreaddir ],
+                       [ Tgetattr, Rgetattr]
+                     ]
       def initialize
         super(coders: RequestReply.flatten.reject(&:nil?))
       end

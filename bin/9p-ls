@@ -1,6 +1,9 @@
 #!/usr/bin/env -S bundle exec ruby
 # -*-ruby-*-
 
+require 'sg/ext'
+using SG::Ext
+
 require 'socket'
 require 'ninep'
 
@@ -13,7 +16,8 @@ port = 564
 uid = 0
 uname = ''
 aname = '/'
-
+short_list = true
+  
 def vputs(*)
   return unless $verbose
   puts(*)
@@ -32,6 +36,30 @@ opts = OptionParser.new do |o|
   o.on('-e', '--aname NAME') do |v|
     aname = v
   end
+  o.on('-l', '--long') do
+    short_list = false
+  end
+end
+
+def getattr(client, path, fid: 3)
+  client.send_one(NineP::Packet.new(tag: 2,
+    data: NineP::Twalk.new(
+      fid: 0,
+      newfid: fid,
+      wnames: path.empty?? [] : path.split('/').collect { NineP::NString.new(_1) })))
+  pkt = client.read_one
+  vputs(pkt.tap { _1.data }.inspect)
+
+  client.send_one(NineP::Packet.new(tag: 3,
+    data: NineP::L2000::Tgetattr.new(fid: fid)))
+  pkt = client.read_one
+  vputs(pkt.tap { _1.data }.inspect)
+
+  client.send_one(NineP::Packet.new(tag: 3,
+                                    data: NineP::Tclunk.new(fid: fid)))
+  vputs(client.read_one.tap { _1.data }.inspect)
+
+  return pkt.data
 end
 
 paths = opts.parse(ARGV)
@@ -92,6 +120,15 @@ paths.each do |path|
   pkt = client.read_one
   vputs(pkt.tap { _1.data }.inspect)
 
+  unless short_list
+    client.send_one(NineP::Packet.new(tag: 3,
+                                      data: NineP::L2000::Tgetattr.new(fid: 2)))
+    pkt = client.read_one
+    vputs(pkt.tap { _1.data }.inspect)
+    puts("\e[1m%s\e[0m" % [ path.empty?? '/' : path ])
+    puts("\e[37m%s\e[0m" % [ pkt.data.to_h.inspect ])
+  end
+  
   client.send_one(NineP::Packet.new(tag: 2,
     data: NineP::L2000::Topen.new(
       fid: 2,
@@ -101,21 +138,38 @@ paths.each do |path|
 
   unless NineP::Rerror === reply.data
     offset = 0
-    puts("\e[1m%s\e[0m" % [ path.empty?? '/' : path ])
+    max_name = 0
+    dir_result = nil
     begin
       client.send_one(NineP::Packet.new(tag: 2,
         data: NineP::L2000::Treaddir.new(
           fid: 2,
           offset: offset,
           count: 256)))
-      pkt = client.read_one
-      vputs(pkt.tap { _1.data }.inspect)
-      ents = pkt.data.entries
-      ents.each do |ent|
-        puts("  \e[1m%s\e[0m" % [ ent.name.to_s ])
+      dir_result = client.read_one
+      vputs(dir_result.tap { _1.data }.inspect)
+      next if NineP::Rerror === dir_result.data
+
+      ents = dir_result.data.entries
+      unless ents.blank?
+        new_max_name = 2 + ents.collect { _1.name.to_s.size }.max
+        max_name = new_max_name if max_name < new_max_name
+        ents.each do |ent|  
+          ent_stats = unless short_list
+                        getattr(client, path + '/' + ent.name.to_s)
+                      end
+          if ent_stats == nil || NineP::Rerror === ent_stats
+            puts("  \e[1m%-*s\e[0m" %
+                 [ max_name, ent.name.to_s ])
+          else
+            puts("  \e[1m%-*s \e[0;37m%8i %6o %8s %8s %18s\e[0m" %
+                 [ max_name, ent.name.to_s, ent_stats.size, ent_stats.mode, ent_stats.uid, ent_stats.gid, Time.at(ent_stats.mtime_sec).strftime("%x %X") ])
+          end
+        end
+        
+        offset += ents.size
       end
-      offset += ents.size
-    end until pkt.data.count == 0
+    end until NineP::Rerror === dir_result.data || dir_result.data.count == 0
 
     client.send_one(NineP::Packet.new(tag: 3,
       data: NineP::Tclunk.new(fid: 2)))
