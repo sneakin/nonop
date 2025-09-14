@@ -95,7 +95,7 @@ paths.each do |path|
   client.send_one(NineP::Packet.new(tag: 2,
     data: NineP::L2000::Topen.new(
       fid: 2,
-      flags: 00200000)))
+      flags: NineP::L2000::Topen::Flags[:DIRECTORY])))
   pkt = client.read_one
   vputs(pkt.tap { _1.data }.inspect)
 
