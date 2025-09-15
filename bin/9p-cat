@@ -16,6 +16,7 @@ if $0 == __FILE__
   uid = 0
   uname = ''
   aname = '/'
+  buffer_size = 4096
   
   def vputs(*)
     return unless $verbose
@@ -29,12 +30,15 @@ if $0 == __FILE__
     o.on('-u', '--uname NAME') do |v|
       uname = v
     end
-    o.on('--uid INTEGER') do |v|
+    o.on('--uid INTEGER', Integer) do |v|
       uid = v.to_i
       uid = nil if uid < 0
     end
     o.on('-e', '--aname NAME') do |v|
       aname = v
+    end
+    o.on('--buffer-size BYTES', Integer) do |v|
+      buffer_size = v
     end
   end
 
@@ -52,62 +56,57 @@ if $0 == __FILE__
     client.close
   end
 
+  # A read loop
+  def print_fn file, offset, length, paths, &blk
+    file.read(length, offset: offset) do |data|
+      raise data if StandardError === data
+      $stdout.write(data)
+      if length == data.bytesize
+        # Read more
+        print_fn(file, offset + length, length, paths, &blk)
+      else
+        # Close the file
+        file.close
+        # Continue on
+        blk.call(paths)
+      end
+    end
+  end
+
+  def read_fn attachment, path = nil, *paths, buffer_size:, &blk
+    # All done?
+    return blk.call if blk && path == nil
+    return if path == nil
+    
+    # Start reading the files
+    $stderr.puts("%s" % [ path ])
+    attachment.open(path, flags: [:RDONLY]) do |file|
+      if StandardError === file
+        $stderr.puts("Error: #{file.message}")
+        next read_fn(attachment, *paths, buffer_size: buffer_size, &blk)
+      end
+      
+      # Start the file read loop
+      print_fn(file, 0, buffer_size, paths) do |rest_paths|
+        # Read the next path
+        read_fn(attachment, *rest_paths, buffer_size: buffer_size, &blk)
+      end
+    end
+  end
+  
   client.start do |pkt|
     if uid
       client.auth(uname: uname, aname: aname, n_uname: uid)
     end
 
-    client.attach(uname: uname, aname: aname, n_uname: uid) do |pkt|
+    NineP::Client::Attachment.new(client: client, uname: uname, aname: aname, n_uname: uid) do |attachment|
+      raise attachment if StandardError === attachment
       # A loop through the paths but only after tte callbacks complete
-      def read_fn client, path, *paths
-        fid = client.next_fid
-        $stderr.puts("%s = %d" % [ path, fid ])
-        client.request(NineP::Twalk.new(fid: 0,
-                                        newfid: fid,
-                                        wnames: path.empty?? [] : path.split('/').collect { NineP::NString.new(_1) })) do |pkt|
-          vputs(pkt.tap { _1 }.inspect)
-
-          client.request(NineP::L2000::Topen.new(fid: fid,
-                                                 flags: NineP::L2000::Topen::Flags[:RDONLY])) do |pkt|
-            vputs(pkt.tap { _1 }.inspect)
-
-            unless NineP::Rerror === pkt
-              # A read loop
-              def print_fn client, fid, offset, length, paths
-                client.request(NineP::Tread.new(fid: fid,
-                                                offset: offset,
-                                                count: length)) do |result|
-                  vputs(result.tap { _1 }.inspect)
-                  if NineP::Rread === result
-                    $stdout.write(result.data)
-                    if length == result.count
-                      # Read more
-                      print_fn(client, fid, offset + length, length, paths)
-                    else
-                      # Close the file
-                      client.clunk(fid, async: true)
-                      if paths.empty?
-                        # All done?
-                        client.clunk(0) do |pkt|
-                          client.close
-                        end
-                      else
-                        # Read the next path
-                        read_fn(client, *paths)
-                      end
-                    end
-                  end
-                end
-              end
-              # Start the file read loop
-              print_fn(client, fid, 0, 4096, paths)
-            end
-          end
+      read_fn(attachment, *paths, buffer_size: buffer_size) do
+        client.clunk(0) do |pkt|
+          client.close
         end
       end
-
-      # Start reading the files
-      read_fn(client, *paths)
     end
   end
 

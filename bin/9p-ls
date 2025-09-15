@@ -89,7 +89,7 @@ if uid
   vputs(reply.tap { _1.data }.inspect)
   #exit(-1) if NineP::Rerror === reply.data
 end
-afid = reply.data.afid unless NineP::Rerror === reply.data
+afid = reply.data.afid unless NineP::ErrorPayload === reply.data
 client.send_one(NineP::Packet.new(tag: 0,
   data: NineP::L2000::Tattach.new(
     fid: 0,
@@ -136,7 +136,7 @@ paths.each do |path|
   pkt = client.read_one
   vputs(pkt.tap { _1.data }.inspect)
 
-  unless NineP::Rerror === reply.data
+  unless NineP::ErrorPayload === reply.data
     offset = 0
     max_name = 0
     dir_result = nil
@@ -148,7 +148,7 @@ paths.each do |path|
           count: 256)))
       dir_result = client.read_one
       vputs(dir_result.tap { _1.data }.inspect)
-      next if NineP::Rerror === dir_result.data
+      next if NineP::ErrorPayload === dir_result.data
 
       ents = dir_result.data.entries
       unless ents.blank?
@@ -158,7 +158,7 @@ paths.each do |path|
           ent_stats = unless short_list
                         getattr(client, path + '/' + ent.name.to_s)
                       end
-          if ent_stats == nil || NineP::Rerror === ent_stats
+          if ent_stats == nil || NineP::ErrorPayload === ent_stats
             puts("  \e[1m%-*s\e[0m" %
                  [ max_name, ent.name.to_s ])
           else
@@ -169,7 +169,7 @@ paths.each do |path|
         
         offset += ents.size
       end
-    end until NineP::Rerror === dir_result.data || dir_result.data.count == 0
+    end until NineP::ErrorPayload === dir_result.data || dir_result.data.count == 0
 
     client.send_one(NineP::Packet.new(tag: 3,
       data: NineP::Tclunk.new(fid: 2)))

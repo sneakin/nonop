@@ -34,6 +34,13 @@ module NineP
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:flags, :uint32l])
+
+      def flags= v
+        @flags = case v
+                 when Array then v.reduce(0) { _1 | Flags[_2] }
+                 else v
+                 end
+      end
     end
 
     class Ropen

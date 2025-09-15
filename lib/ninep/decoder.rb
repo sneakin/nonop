@@ -14,6 +14,7 @@ require_relative 'messages/remove'
 require_relative 'messages/stat'
 require_relative 'messages/read'
 
+require_relative 'messages/2000L/error'
 require_relative 'messages/2000L/auth'
 require_relative 'messages/2000L/attach'
 require_relative 'messages/2000L/open'
@@ -120,7 +121,8 @@ module NineP
     class Decoder < NineP::Decoder
       RequestReply = [ [ Tversion, Rversion ],
                        [ Tattach, Rattach ],
-                       [ nil, Rerror ],
+                       [ nil, NineP::Rerror ],
+                       [ nil, L2000::Rerror ],
                        [ Tauth, Rauth ],
                        [ Tclunk, Rclunk ],
                        [ Twalk, Rwalk ],
