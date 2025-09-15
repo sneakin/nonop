@@ -103,9 +103,7 @@ if $0 == __FILE__
       raise attachment if StandardError === attachment
       # A loop through the paths but only after tte callbacks complete
       read_fn(attachment, *paths, buffer_size: buffer_size) do
-        client.clunk(0) do |pkt|
-          client.close
-        end
+        client.close
       end
     end
   end

@@ -14,6 +14,7 @@ module NineP
       @next_tag = 0
       @next_fid = 0
       @afid = -1
+      @open_fids = {}
     end
     
     def read_one
@@ -65,6 +66,10 @@ module NineP
     def next_fid
       @next_fid = (@next_fid + 1) & 0xFFFF
     end
+
+    def track_fid fid, &blk
+      @open_fids[fid] = blk || lambda { self.clunk(fid) }
+    end
     
     def next_tag
       @next_tag = (@next_tag + 1) & 0xFFFF
@@ -85,9 +90,16 @@ module NineP
     def flush
       @io.flush
     end
-    
+   
     def close
+      close_fids
       @io.close
+    end
+
+    def close_fids
+      @open_fids.each { _2.call }
+      @open_fids.clear
+      self
     end
     
     def closed?
@@ -107,6 +119,7 @@ module NineP
             version: pkt.version,
             msize: pkt.msize
           }
+          track_fid(0)
         end
         blk&.call(pkt)
       end
@@ -128,24 +141,8 @@ module NineP
       self
     end
 
-    def attach afid: nil, uname:, n_uname:, aname:, &blk
-      request(NineP::L2000::Tattach.new(fid: 0,
-                                        afid: afid || -1,
-                                        uname: NineP::NString.new(uname),
-                                        aname: NineP::NString.new(aname),
-                                        n_uname: n_uname || -1),
-              wait_for: blk == nil) do |pkt|
-        case pkt
-        when ErrorPayload then raise AttachError.new(pkt)
-        when Rattach then
-          @qid = pkt.aqid
-        end
-        blk&.call(pkt)
-      end
-      self
-    end
-
     def clunk fid, async: nil, &blk
+      @open_fids.delete(fid) # todo call this? default calls back.
       request(NineP::Tclunk.new(fid: fid),
               wait_for: async != true && blk == nil,
               &blk)
@@ -166,6 +163,7 @@ module NineP
                                         wnames: @path.collect { NineP::NString.new(_1) })) do |pkt|
           case pkt
           when Rwalk then
+            client.track_fid(@fid)
             client.request(NineP::L2000::Topen.new(fid: @fid,
                                                    flags: @flags)) do |pkt|
               @ready = true
@@ -182,7 +180,7 @@ module NineP
       end
       
       def close
-        client.request(NineP::Tclunk.new(fid: fid))
+        client.clunk(fid)
         self
       end
 
@@ -212,16 +210,6 @@ module NineP
       end
     end
 
-    class WalkTarget
-      attr_reader :fid
-      
-      def initialize path
-      end
-      
-      def close
-      end
-    end
-    
     class Attachment
       attr_reader :qid, :client
       attr_reader :fid, :afid, :uname, :n_uname, :aname
@@ -241,6 +229,7 @@ module NineP
           case pkt
           when ErrorPayload then raise AttachError.new(pkt)
           when Rattach then
+            client.track_fid(@fid)
             @qid = pkt.aqid
             @ready = true
             blk&.call(self)
