@@ -12,6 +12,7 @@ require_relative 'messages/walk'
 require_relative 'messages/clunk'
 require_relative 'messages/remove'
 require_relative 'messages/stat'
+require_relative 'messages/read'
 
 require_relative 'messages/2000L/auth'
 require_relative 'messages/2000L/attach'
@@ -29,6 +30,7 @@ module NineP
                        [ Twalk, Rwalk ],
                        [ Tremove, Rremove ],
                        [ Tstat, Rstat ],
+                       [ Tread, Rread ],
                      ]
 
     class DecodeError < RuntimeError
@@ -57,6 +59,10 @@ module NineP
       @packet_types = Hash.new(NopDecoder)
       add_packet_types(coders) unless coders&.empty?
     end
+
+    def version
+      '9P2000.L'
+    end
     
     class NopDecoder
       def self.unpack str
@@ -66,7 +72,6 @@ module NineP
 
     def send_one pkt, io
       data = pkt.pack
-      $stderr.puts("> %s %s" % [ pkt.data.class.name, data.inspect ]) if $verbose
       io.write(data)
     end
     
@@ -119,6 +124,7 @@ module NineP
                        [ Tauth, Rauth ],
                        [ Tclunk, Rclunk ],
                        [ Twalk, Rwalk ],
+                       [ Tread, Rread ],
                        [ Tremove, Rremove ],
                        [ Tstat, Rstat ],
                        [ Topen, Ropen ],

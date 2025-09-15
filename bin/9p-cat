@@ -1,0 +1,115 @@
+#!/usr/bin/env -S bundle exec ruby
+# -*-ruby-*-
+
+require 'sg/ext'
+using SG::Ext
+
+require 'socket'
+require 'ninep'
+
+if $0 == __FILE__
+  require 'optparse'
+
+  $verbose = false
+  host = 'localhost'
+  port = 564
+  uid = 0
+  uname = ''
+  aname = '/'
+  
+  def vputs(*)
+    return unless $verbose
+    puts(*)
+  end
+
+  opts = OptionParser.new do |o|
+    o.on('-v', '--verbose') do
+      $verbose = true
+    end
+    o.on('-u', '--uname NAME') do |v|
+      uname = v
+    end
+    o.on('--uid INTEGER') do |v|
+      uid = v.to_i
+      uid = nil if uid < 0
+    end
+    o.on('-e', '--aname NAME') do |v|
+      aname = v
+    end
+  end
+
+  paths = opts.parse(ARGV)
+  paths << '' if paths.empty?
+
+  sock = TCPSocket.new(host, port)
+  client = NineP::Client.new(coder: NineP::L2000::Decoder.new,
+                             io: sock)
+
+  Signal.trap('INT') do
+    client.close
+  end
+  Signal.trap('QUIT') do
+    client.close
+  end
+
+  client.start do |pkt|
+    if uid
+      client.auth(uname: uname, aname: aname, n_uname: uid)
+    end
+
+    client.attach(uname: uname, aname: aname, n_uname: uid) do |pkt|
+      # A loop through the paths but only after tte callbacks complete
+      def read_fn client, path, *paths
+        fid = client.next_fid
+        $stderr.puts("%s = %d" % [ path, fid ])
+        client.request(NineP::Twalk.new(fid: 0,
+                                        newfid: fid,
+                                        wnames: path.empty?? [] : path.split('/').collect { NineP::NString.new(_1) })) do |pkt|
+          vputs(pkt.tap { _1 }.inspect)
+
+          client.request(NineP::L2000::Topen.new(fid: fid,
+                                                 flags: NineP::L2000::Topen::Flags[:RDONLY])) do |pkt|
+            vputs(pkt.tap { _1 }.inspect)
+
+            unless NineP::Rerror === pkt
+              # A read loop
+              def print_fn client, fid, offset, length, paths
+                client.request(NineP::Tread.new(fid: fid,
+                                                offset: offset,
+                                                count: length)) do |result|
+                  vputs(result.tap { _1 }.inspect)
+                  if NineP::Rread === result
+                    $stdout.write(result.data)
+                    if length == result.count
+                      # Read more
+                      print_fn(client, fid, offset + length, length, paths)
+                    else
+                      # Close the file
+                      client.clunk(fid, async: true)
+                      if paths.empty?
+                        # All done?
+                        client.clunk(0) do |pkt|
+                          client.close
+                        end
+                      else
+                        # Read the next path
+                        read_fn(client, *paths)
+                      end
+                    end
+                  end
+                end
+              end
+              # Start the file read loop
+              print_fn(client, fid, 0, 4096, paths)
+            end
+          end
+        end
+      end
+
+      # Start reading the files
+      read_fn(client, *paths)
+    end
+  end
+
+  client.read_loop
+end
