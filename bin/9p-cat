@@ -99,7 +99,7 @@ if $0 == __FILE__
       client.auth(uname: uname, aname: aname, n_uname: uid)
     end
 
-    NineP::Client::Attachment.new(client: client, uname: uname, aname: aname, n_uname: uid) do |attachment|
+   client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
       raise attachment if StandardError === attachment
       # A loop through the paths but only after tte callbacks complete
       read_fn(attachment, *paths, buffer_size: buffer_size) do

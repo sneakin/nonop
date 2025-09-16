@@ -2,6 +2,7 @@ require 'sg/ext'
 using SG::Ext
 
 require_relative 'errors'
+require_relative 'client/attachment'
 
 module NineP
   class Client
@@ -58,7 +59,7 @@ module NineP
       @handlers[tag] = fn
       self
     end
-    
+
     def send_one pkt
       @coder.send_one(pkt, @io)
     end
@@ -150,105 +151,8 @@ module NineP
       self
     end
 
-    class RemoteFile
-      attr_reader :client, :path, :flags, :fid, :parent_fid
-      
-      def initialize path, client:, flags: nil, fid: nil, parent_fid: nil, &blk
-        @path = path.empty?? [] : path.split('/')
-        @client = client
-        @flags = flags || NineP::L2000::Topen::Flags[:RDONLY]
-        @fid = fid || client.next_fid
-        @parent_fid = parent_fid || 0
-        client.request(NineP::Twalk.new(fid: @parent_fid,
-                                        newfid: @fid,
-                                        wnames: @path.collect { NineP::NString.new(_1) })) do |pkt|
-          case pkt
-          when Rwalk then
-            client.track_fid(@fid)
-            client.request(NineP::L2000::Topen.new(fid: @fid,
-                                                   flags: @flags)) do |pkt|
-              @ready = true
-              blk&.call(self)
-            end
-          when ErrorPayload then blk&.call(WalkError.new(pkt, path))
-          else raise TypeError.new(pkt.class)
-          end
-        end
-      end
-
-      def ready?
-        @ready
-      end
-      
-      def close
-        client.clunk(fid)
-        self
-      end
-
-      # todo length limited to msglen
-      def read length, offset: 0, &blk
-        req = client.request(NineP::Tread.new(fid: fid,
-                                        offset: offset,
-                                        count: length),
-                       wait_for: blk == nil) do |result|
-          blk&.call(ErrorPayload === result ? ReadError.new(result, path.join('/')) : result.data)
-        end
-
-        if blk
-          self
-        else
-          case req.data
-          when Rread then return req.data.data
-          when ErrorPayload then raise ReadError.new(req.data, path)
-          else raise TypeError.new(req)
-          end
-        end
-      end
-    end
-
-    class RemoteDir
-      def close
-      end
-    end
-
-    class Attachment
-      attr_reader :qid, :client
-      attr_reader :fid, :afid, :uname, :n_uname, :aname
-
-      def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, &blk
-        @client = client
-        @fid = fid || 0
-        @afid = afid || -1
-        @uname = uname || ''
-        @n_uname = n_uname || -1
-        @aname = aname
-        client.request(NineP::L2000::Tattach.new(fid: @fid,
-                                          afid: @afid,
-                                          uname: NineP::NString.new(uname),
-                                          aname: NineP::NString.new(aname),
-                                          n_uname: n_uname)) do |pkt|
-          case pkt
-          when ErrorPayload then raise AttachError.new(pkt)
-          when Rattach then
-            client.track_fid(@fid)
-            @qid = pkt.aqid
-            @ready = true
-            blk&.call(self)
-          end
-        end
-      end
-
-      def ready?
-        @ready
-      end
-
-      def open *a, **o, &blk
-        raise NotReady unless ready?
-        RemoteFile.new(*a, **o.merge(parent_fid: fid, client: client), &blk)
-      end
-
-      def opendir path
-      end
+    def attach(**opts, &blk)
+      Attachment.new(**opts.merge(client: self), &blk)
     end
   end
 end
