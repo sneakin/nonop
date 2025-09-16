@@ -23,6 +23,7 @@ require_relative 'messages/2000L/getattr'
 
 module NineP
   class Decoder
+    MAX_MSGLEN = 65535
     RequestReplies = [ [ Tversion, Rversion ],
                        [ Tattach, Rattach ],
                        [ nil, Rerror ],
@@ -55,14 +56,18 @@ module NineP
     attr_reader :packet_types
     attr_accessor :max_msglen
     
-    def initialize coders: nil, max_msglen: 65536
-      @max_msglen = max_msglen
+    def initialize coders: nil, max_msglen: nil
+      @max_msglen = max_msglen || MAX_MSGLEN
       @packet_types = Hash.new(NopDecoder)
       add_packet_types(coders) unless coders&.empty?
     end
 
     def version
       '9P2000.L'
+    end
+    
+    def max_datalen
+      max_msglen - 7 # Packet.attribute_offset(:raw_data)
     end
     
     class NopDecoder
@@ -133,8 +138,8 @@ module NineP
                        [ Treaddir, Rreaddir ],
                        [ Tgetattr, Rgetattr]
                      ]
-      def initialize
-        super(coders: RequestReply.flatten.reject(&:nil?))
+      def initialize **opts
+        super(**opts.merge(coders: RequestReply.flatten.reject(&:nil?)))
       end
     end
   end

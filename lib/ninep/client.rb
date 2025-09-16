@@ -5,7 +5,7 @@ require_relative 'errors'
 
 module NineP
   class Client
-    attr_reader :server_info, :afid
+    attr_reader :coder, :io, :buffer_size, :server_info, :afid
     
     def initialize coder:, io:
       @coder = coder
@@ -106,15 +106,16 @@ module NineP
       @io.closed?
     end
 
-    delegate :max_msglen, :max_msglen=, to: :coder
+    delegate :max_msglen, :max_msglen=, :max_datalen, to: :coder
 
     def start &blk
-      request(Tversion.new(msize: 65535,
+      request(Tversion.new(msize: max_msglen,
                            version: NString.new(@coder.version)),
                     wait_for: blk == nil) do |pkt|
         case pkt
-        when ErrorPayload then raise StartError(pkt)
+        when ErrorPayload then raise StartError.new(pkt)
         when Rversion then
+          @max_msglen = [ max_msglen, pkt.msize ].min
           @server_info = {
             version: pkt.version,
             msize: pkt.msize
