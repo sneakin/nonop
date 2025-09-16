@@ -22,4 +22,6 @@ module NineP
   end
   class WalkError < ProtocolError
   end
+  class GetAttrError < ProtocolError
+  end
 end

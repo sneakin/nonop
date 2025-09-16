@@ -41,27 +41,6 @@ opts = OptionParser.new do |o|
   end
 end
 
-def getattr(client, path, fid: 3)
-  client.send_one(NineP::Packet.new(tag: 2,
-    data: NineP::Twalk.new(
-      fid: 0,
-      newfid: fid,
-      wnames: path.empty?? [] : path.split('/').collect { NineP::NString.new(_1) })))
-  pkt = client.read_one
-  vputs(pkt.tap { _1.data }.inspect)
-
-  client.send_one(NineP::Packet.new(tag: 3,
-    data: NineP::L2000::Tgetattr.new(fid: fid)))
-  pkt = client.read_one
-  vputs(pkt.tap { _1.data }.inspect)
-
-  client.send_one(NineP::Packet.new(tag: 3,
-                                    data: NineP::Tclunk.new(fid: fid)))
-  vputs(client.read_one.tap { _1.data }.inspect)
-
-  return pkt.data
-end
-
 paths = opts.parse(ARGV)
 paths << '' if paths.empty?
 
@@ -76,109 +55,51 @@ Signal.trap('QUIT') do
   client.close
 end
 
-client.send_one(NineP::Packet.new(tag: -1, data: NineP::Tversion.new(msize: 65535, version: NineP::NString.new('9P2000.L'))))
-vputs(client.read_one.tap { _1.data }.inspect)
-if uid
-  client.send_one(NineP::Packet.new(tag: 0,
-    data: NineP::L2000::Tauth.new(
-      afid: 0,
-      uname: NineP::NString.new(uname),
-      aname: NineP::NString.new(aname),
-      n_uname: uid)))
-  reply = client.read_one
-  vputs(reply.tap { _1.data }.inspect)
-  #exit(-1) if NineP::Rerror === reply.data
-end
-afid = reply.data.afid unless NineP::ErrorPayload === reply.data
-client.send_one(NineP::Packet.new(tag: 0,
-  data: NineP::L2000::Tattach.new(
-    fid: 0,
-    afid: afid || -1,
-    uname: NineP::NString.new(uname),
-    aname: NineP::NString.new(aname),
-    n_uname: uid || -1)))
-reply = client.read_one
-vputs(reply.tap { _1.data }.inspect)
-qid = reply.data.aqid if NineP::Rattach === reply.data
-
-client.send_one(NineP::Packet.new(tag: 1,
-  data: NineP::Twalk.new(
-    fid: 0,
-    newfid: 1,
-    wnames: [ NineP::NString.new('/') ])))
-vputs(client.read_one.tap { _1.data }.inspect)
-client.send_one(NineP::Packet.new(tag: 3,
-  data: NineP::Tclunk.new(fid: 1)))
-vputs(client.read_one.tap { _1.data }.inspect)
-
-paths.each do |path|
-  client.send_one(NineP::Packet.new(tag: 2,
-    data: NineP::Twalk.new(
-      fid: 0,
-      newfid: 2,
-      wnames: path.empty?? [] : path.split('/').collect { NineP::NString.new(_1) })))
-  pkt = client.read_one
-  vputs(pkt.tap { _1.data }.inspect)
-
-  unless short_list
-    client.send_one(NineP::Packet.new(tag: 3,
-                                      data: NineP::L2000::Tgetattr.new(fid: 2)))
-    pkt = client.read_one
-    vputs(pkt.tap { _1.data }.inspect)
-    puts("\e[1m%s\e[0m" % [ path.empty?? '/' : path ])
-    puts("\e[37m%s\e[0m" % [ pkt.data.to_h.inspect ])
-  end
+def dir_loop attachment, path = nil, *paths, max_name: 0, short_list: true, &blk
+  return blk.call if path == nil
   
-  client.send_one(NineP::Packet.new(tag: 2,
-    data: NineP::L2000::Topen.new(
-      fid: 2,
-      flags: NineP::L2000::Topen::Flags[:DIRECTORY])))
-  pkt = client.read_one
-  vputs(pkt.tap { _1.data }.inspect)
+  attachment.opendir(path) do |dir|
+    if StandardError === dir
+      $stderr.puts("%s - %s" % [ path, dir ])
+      next blk.call
+    end
 
-  unless NineP::ErrorPayload === reply.data
-    offset = 0
-    max_name = 0
-    dir_result = nil
-    begin
-      client.send_one(NineP::Packet.new(tag: 2,
-        data: NineP::L2000::Treaddir.new(
-          fid: 2,
-          offset: offset,
-          count: 256)))
-      dir_result = client.read_one
-      vputs(dir_result.tap { _1.data }.inspect)
-      next if NineP::ErrorPayload === dir_result.data
-
-      ents = dir_result.data.entries
-      unless ents.blank?
-        new_max_name = 2 + ents.collect { _1.name.to_s.size }.max
-        max_name = new_max_name if max_name < new_max_name
-        ents.each do |ent|  
-          ent_stats = unless short_list
-                        getattr(client, path + '/' + ent.name.to_s)
-                      end
-          if ent_stats == nil || NineP::ErrorPayload === ent_stats
-            puts("  \e[1m%-*s\e[0m" %
-                 [ max_name, ent.name.to_s ])
-          else
-            puts("  \e[1m%-*s \e[0;37m%8i %6o %8s %8s %18s\e[0m" %
-                 [ max_name, ent.name.to_s, ent_stats.size, ent_stats.mode, ent_stats.uid, ent_stats.gid, Time.at(ent_stats.mtime_sec).strftime("%x %X") ])
-          end
-        end
-        
-        offset += ents.size
+    new_max_name = 2 + dir.entries.collect { _1.name.to_s.size }.max
+    max_name = new_max_name if max_name < new_max_name
+    dir.entries do |ent|
+      ent_stats = unless short_list
+                    attachment.getattr(path + '/' + ent.name.to_s)
+                  end
+      if ent_stats == nil
+        puts("  \e[1m%-*s\e[0m" %
+             [ max_name, ent.name.to_s ])
+      elsif StandardError === ent_stats
+        puts("  \e[1m%-*s\e[0m %s" %
+             [ max_name, ent.name.to_s, ent_stats ])
+      else
+        puts("  \e[1m%-*s \e[0;37m%8i %6o %8s %8s %18s\e[0m" %
+             [ max_name, ent.name.to_s, ent_stats.size, ent_stats.mode, ent_stats.uid, ent_stats.gid, Time.at(ent_stats.mtime_sec).strftime("%x %X") ])
       end
-    end until NineP::ErrorPayload === dir_result.data || dir_result.data.count == 0
+    end
 
-    client.send_one(NineP::Packet.new(tag: 3,
-      data: NineP::Tclunk.new(fid: 2)))
-    vputs(client.read_one.tap { _1.data }.inspect)
+    dir_loop(attachment, *paths, max_name:, short_list:, &blk)
   end
 end
 
-client.send_one(NineP::Packet.new(tag: 3,
-  data: NineP::Tclunk.new(fid: 0)))
-vputs(client.read_one.tap { _1.data }.inspect)
-client.close
+client.start do |pkt|
+  if uid
+    client.auth(uname: uname, aname: aname, n_uname: uid)
+  end
+
+  client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+    raise attachment if StandardError === attachment
+
+    dir_loop(attachment, *paths, short_list: short_list) do
+      client.close
+    end
+  end
+end
+
+client.read_loop
+
 end

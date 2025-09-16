@@ -43,7 +43,7 @@ module NineP
                                             offset: offset,
                                             count: length),
                            wait_for: blk == nil) do |result|
-        blk&.call(ErrorPayload === result ? ReadError.new(result, path.join('/')) : result.data)
+        blk&.call(wrap_error_or_data(result, ReadError))
       end
 
       if blk
@@ -56,5 +56,13 @@ module NineP
         end
       end
     end
+
+    def wrap_error_or_data pkt, error = Error
+      case pkt
+      when ErrorPayload then error.new(pkt, path)
+      else pkt.data
+      end
+    end
+    
   end
 end

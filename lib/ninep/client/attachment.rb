@@ -42,7 +42,30 @@ module NineP
       RemoteFile.new(*a, **o.merge(parent_fid: fid, client: client), &blk)
     end
 
-    def opendir path
+    def opendir *a, **o, &blk
+      raise NotReady unless ready?
+      RemoteDir.new(*a, **o.merge(parent_fid: fid, client: client), &blk)
+    end
+
+    def getattr(path, fid: nil, &blk)
+      nfid ||= client.next_fid
+      result = nil
+      client.request(NineP::Twalk.new(fid: self.fid,
+                                      newfid: nfid,
+                                      wnames: path.empty?? [] : path.split('/').collect { NineP::NString.new(_1) }),
+                     wait_for: blk == nil) do |walk|
+        result = client.request(NineP::L2000::Tgetattr.new(fid: nfid),
+                                wait_for: blk == nil) do |pkt|
+          client.clunk(nfid)
+          blk&.call(NineP.maybe_wrap_error(pkt, GetAttrError))
+        end
+      end
+
+      if blk
+        self
+      else
+        NineP.maybe_wrap_error(result.data, GetAttrError)
+      end
     end
   end
 end
