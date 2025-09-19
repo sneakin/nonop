@@ -18,9 +18,15 @@ module NineP
   end
   class AttachError < ProtocolError
   end
+  class WalkError < ProtocolError
+  end
+  class OpenError < ProtocolError
+  end
+  class CreateError < ProtocolError
+  end
   class ReadError < ProtocolError
   end
-  class WalkError < ProtocolError
+  class WriteError < ProtocolError
   end
   class GetAttrError < ProtocolError
   end

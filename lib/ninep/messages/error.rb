@@ -8,9 +8,9 @@ module NineP
     attr_reader :code
   end
 
-  def self.maybe_wrap_error pkt, error = Error
+  def self.maybe_wrap_error pkt, error = Error, msg: nil
     case pkt
-    when ErrorPayload then error.new(pkt, path)
+    when ErrorPayload then error.new(pkt, msg)
     else pkt
     end
   end

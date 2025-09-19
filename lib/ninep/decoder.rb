@@ -13,16 +13,19 @@ require_relative 'messages/clunk'
 require_relative 'messages/remove'
 require_relative 'messages/stat'
 require_relative 'messages/read'
+require_relative 'messages/write'
 
 require_relative 'messages/2000L/error'
 require_relative 'messages/2000L/auth'
 require_relative 'messages/2000L/attach'
 require_relative 'messages/2000L/open'
+require_relative 'messages/2000L/create'
 require_relative 'messages/2000L/readdir'
 require_relative 'messages/2000L/getattr'
 
 module NineP
   class Decoder
+    MIN_MSGLEN = 128
     MAX_MSGLEN = 65535
     RequestReplies = [ [ Tversion, Rversion ],
                        [ Tattach, Rattach ],
@@ -33,6 +36,7 @@ module NineP
                        [ Tremove, Rremove ],
                        [ Tstat, Rstat ],
                        [ Tread, Rread ],
+                       [ Twrite, Rwrite ],
                      ]
 
     class DecodeError < RuntimeError
@@ -52,11 +56,12 @@ module NineP
         "Decode error: #{size || '---'} is not between 0 and #{max_msglen || '---'}"
       end
     end
-    
+
     attr_reader :packet_types
     attr_accessor :max_msglen
     
     def initialize coders: nil, max_msglen: nil
+      raise ArgumentError.new("max_msglen must be > #{MIN_MSGLEN}") if max_msglen && max_msglen <= MIN_MSGLEN
       @max_msglen = max_msglen || MAX_MSGLEN
       @packet_types = Hash.new(NopDecoder)
       add_packet_types(coders) unless coders&.empty?
@@ -67,7 +72,7 @@ module NineP
     end
     
     def max_datalen
-      max_msglen - 7 # Packet.attribute_offset(:raw_data)
+      max_msglen - MIN_MSGLEN # Packet.attribute_offset(:raw_data)
     end
     
     class NopDecoder
@@ -132,9 +137,11 @@ module NineP
                        [ Tclunk, Rclunk ],
                        [ Twalk, Rwalk ],
                        [ Tread, Rread ],
+                       [ Twrite, Rwrite ],
                        [ Tremove, Rremove ],
                        [ Tstat, Rstat ],
                        [ Topen, Ropen ],
+                       [ Tcreate, Rcreate ],
                        [ Treaddir, Rreaddir ],
                        [ Tgetattr, Rgetattr]
                      ]

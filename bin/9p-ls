@@ -86,6 +86,38 @@ def dir_loop attachment, path = nil, *paths, max_name: 0, short_list: true, &blk
   end
 end
 
+def dir_loop attachment, paths, max_name: 0, short_list: true, &blk
+  NineP::Async.reduce(paths) do |path, &cc|
+    attachment.opendir(path) do |dir|
+      if StandardError === dir
+        $stderr.puts("%s - %s" % [ path, dir ])
+        next cc.call(false, &blk)
+      end
+
+      # todo triggers multiple readdir requests
+      new_max_name = 2 + dir.entries.collect { _1.name.to_s.size }.max
+      max_name = new_max_name if max_name < new_max_name
+      dir.entries do |ent|
+        ent_stats = unless short_list
+                      attachment.getattr(path + '/' + ent.name.to_s)
+                    end
+        if ent_stats == nil
+          puts("  \e[1m%-*s\e[0m" %
+               [ max_name, ent.name.to_s ])
+        elsif StandardError === ent_stats
+          puts("  \e[1m%-*s\e[0m %s" %
+               [ max_name, ent.name.to_s, ent_stats ])
+        else
+          puts("  \e[1m%-*s \e[0;37m%8i %6o %8s %8s %18s\e[0m" %
+               [ max_name, ent.name.to_s, ent_stats.size, ent_stats.mode, ent_stats.uid, ent_stats.gid, Time.at(ent_stats.mtime_sec).strftime("%x %X") ])
+        end
+      end
+
+      cc.call(false, &blk)
+    end
+  end
+end
+
 client.start do |pkt|
   if uid
     client.auth(uname: uname, aname: aname, n_uname: uid)
@@ -94,7 +126,7 @@ client.start do |pkt|
   client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
     raise attachment if StandardError === attachment
 
-    dir_loop(attachment, *paths, short_list: short_list) do
+    dir_loop(attachment, paths, short_list: short_list) do
       client.close
     end
   end

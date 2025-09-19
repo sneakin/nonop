@@ -36,10 +36,15 @@ module NineP
                      [:flags, :uint32l])
 
       def flags= v
-        @flags = case v
-                 when Array then v.reduce(0) { _1 | Flags[_2] }
-                 else v
-                 end
+        @flags = self.class.flag_mask(v)
+      end
+
+      def self.flag_mask v
+        case v
+        when Array then v.reduce(0) { _1 | Flags[_2] }
+        when Symbol then Flags[v]
+        else v
+        end
       end
     end
 
