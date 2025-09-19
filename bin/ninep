@@ -1,0 +1,9 @@
+#!/usr/bin/env -S bundle exec ruby
+# -*-ruby-*-
+
+require 'sg/ext'
+using SG::Ext
+
+require 'sg/meta-command'
+
+SG::MetaCommand.new(File.dirname(__FILE__)).run
