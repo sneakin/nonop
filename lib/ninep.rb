@@ -5,6 +5,7 @@ require 'sg/ext'
 using SG::Ext
 
 module NineP
+  MAX_U64 = 0xFFFFFFFFFFFFFFFF
 end
 
 require_relative 'ninep/util'

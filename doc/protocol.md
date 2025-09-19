@@ -357,7 +357,7 @@ type has one of the values:
 #define P9_LOCK_TYPE_RDLCK 0
 #define P9_LOCK_TYPE_WRLCK 1
 #define P9_LOCK_TYPE_UNLCK 2
-````
+```
 start, length, and proc_id correspond to the analogous fields passed to Linux fcntl(F_SETLK):
 ```
 struct flock {

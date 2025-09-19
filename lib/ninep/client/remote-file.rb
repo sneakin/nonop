@@ -6,32 +6,44 @@ require_relative '../util'
 
 module NineP
   class RemoteFile
-    attr_reader :client, :path, :flags, :fid, :parent_fid
+    attr_reader :attachment, :path, :flags, :fid
     
-    def initialize path, client:, flags: nil, fid: nil, parent_fid: nil, mode: nil, gid: nil, &blk
+    def initialize path, attachment:, flags: nil, fid: nil, mode: nil, gid: nil, &blk
       @path = path.empty?? [] : path.split('/')
-      @client = client
+      @attachment = attachment
       @flags = L2000::Topen.flag_mask(flags || [:RDONLY])
       @fid = fid || client.next_fid
-      @parent_fid = parent_fid || 0
 
       open(mode: mode, gid: gid, &blk)
     end
 
+    def client
+      attachment.client
+    end
+
+    def parent_fid
+      attachment.fid
+    end
+
     def open mode: nil, gid: nil, &blk
-      client.request(NineP::Twalk.new(fid: @parent_fid,
-                                      newfid: @fid,
-                                      wnames: @path.collect { NineP::NString.new(_1) })) do |pkt|
+      attachment.walk(@path, nfid: @fid) do |pkt|
         case pkt
         when Rwalk then
-          client.track_fid(@fid) # todo falsify ready
-          client.request(NineP::L2000::Topen.new(fid: @fid,
-                                                 flags: @flags)) do |pkt|
-            if ErrorPayload === pkt
-              blk&.call(OpenError.new(pkt))
-            else
-              @ready = true
-              blk&.call(self)
+          if pkt.nwqid < @path.size
+            blk&.call(WalkError.new(2, @path[0, pkt.nwqid].join('/')))
+          else
+            client.track_fid(@fid) do
+              @ready = false
+              close
+            end
+            client.request(NineP::L2000::Topen.new(fid: @fid,
+                                                   flags: @flags)) do |pkt|
+              if ErrorPayload === pkt
+                blk&.call(OpenError.new(pkt))
+              else
+                @ready = true
+                blk&.call(self)
+              end
             end
           end
         when ErrorPayload then
@@ -50,12 +62,9 @@ module NineP
     end
 
     def create mode: nil, gid: nil, &blk
-      client.request(NineP::Twalk.new(fid: @parent_fid,
-                                      newfid: @fid,
-                                      wnames: [])) do |pkt|
+      attachment.walk([], nfid: @fid) do |pkt|
         case pkt
         when Rwalk then
-          client.track_fid(@fid)
           client.request(L2000::Tcreate.new(fid: @fid,
                                             name: NString.new(@path.last),
                                             flags: @flags,

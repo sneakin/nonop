@@ -7,7 +7,7 @@ module NineP
     
   class ProtocolError < Error
     def initialize err, msg = nil
-      sys = SystemCallError.new(msg, err.code)
+      sys = SystemCallError.new(msg, Integer === err ? err : err.code)
       super(sys.message)
     end
   end

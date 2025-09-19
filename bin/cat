@@ -57,12 +57,10 @@ if $0 == __FILE__
     client.close
   end
 
-  MAX_U64 = 0xFFFFFFFFFFFFFFFF
-
   # A read loop
   def read_fn file, offset, length, &blk
     # todo move into RemoteFile?
-    NineP::Async.reduce(0.upto(MAX_U64), 0) do |count, offset, &cc|
+    NineP::Async.reduce(0.upto(NineP::MAX_U64), 0) do |count, offset, &cc|
       file.read(length, offset: offset) do |data|
         raise data if StandardError === data # todo where is it handled?
         blk.call(data)
