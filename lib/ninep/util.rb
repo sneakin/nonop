@@ -2,6 +2,15 @@ require 'sg/ext'
 using SG::Ext
 
 module NineP
+  def self.vputs(*lines, io: $stderr, &blk)
+    return unless $verbose
+    io.puts(*lines) unless lines.blank?
+    if blk
+      more = blk.call
+      puts(more) if more
+    end
+  end
+
   def self.block_string(str, block_size, offset: nil, length: nil)
     Enumerator.new do |y|
       offset = offset || 0

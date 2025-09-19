@@ -21,11 +21,6 @@ if $0 == __FILE__
   write_offset = 0
   write_limit = nil
   
-  def vputs(*)
-    return unless $verbose
-    puts(*)
-  end
-
   opts = OptionParser.new do |o|
     desc = 'Write a file to a file server.'
     o.banner += "\n\n" + desc + "\n"
@@ -98,13 +93,13 @@ if $0 == __FILE__
         raise file if StandardError === file
         
         doner = lambda do |*state|
-          vputs("ALL DONE")
+          NineP.vputs("ALL DONE")
           file.close
           client.close
         end
 
         NineP::Async.reduce(reader, 0, write_offset) do |data_block, count, offset, &cc|
-          vputs("Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}")
+          NineP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
           file.write(data_block, offset: offset) do |reply|
             if StandardError === reply
               cc.call(reply, count, offset, &doner)

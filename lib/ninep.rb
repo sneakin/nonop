@@ -7,6 +7,7 @@ using SG::Ext
 module NineP
 end
 
+require_relative 'ninep/util'
 require_relative 'ninep/decoder'
 require_relative 'ninep/client'
 

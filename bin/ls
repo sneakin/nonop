@@ -17,11 +17,6 @@ uid = 0
 uname = ''
 aname = '/'
 short_list = true
-  
-def vputs(*)
-  return unless $verbose
-  puts(*)
-end
 
 opts = OptionParser.new do |o|
   desc = 'List a directory from a file server.'

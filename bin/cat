@@ -17,11 +17,6 @@ if $0 == __FILE__
   uname = ''
   aname = '/'
   buffer_size = 4096
-  
-  def vputs(*)
-    return unless $verbose
-    puts(*)
-  end
 
   opts = OptionParser.new do |o|
     desc = 'Read a file from a file server.'
@@ -92,7 +87,7 @@ if $0 == __FILE__
       NineP::Async.reduce(paths, []) do |path, counts, &cc|
         attachment.open(path, flags: [:RDONLY]) do |file|
           fin = lambda do |final_count|
-            vputs(paths.zip(final_count).to_a.inspect)
+            NineP.vputs { paths.zip(final_count).to_a.inspect }
             client.close
           end
           if StandardError === file
