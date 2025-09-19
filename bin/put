@@ -23,7 +23,7 @@ if $0 == __FILE__
   
   opts = OptionParser.new do |o|
     desc = 'Write a file to a file server.'
-    o.banner += "\n\n" + desc + "\n"
+    o.banner += "\n\n" + desc + "\n\n"
     o.on('--help-banner') do
       puts(desc)
       exit(0)
