@@ -7,9 +7,9 @@ Gem::Specification.new do |s|
   s.authors     = ["Nolan Eakins <sneakin@semanticgap.com>"]
   s.email       = 'support@semanticgap.com'
   s.files       = [ "lib/**/*.rb" ]
-  s.homepage    = 'https://oss.semanticgap.com/ruby/9prb'
+  s.homepage    = 'https://oss.semanticgap.com/ruby/ninep'
   s.metadata    = {
-    "source_code_uri" => "https://github.com/sneakin/9prb"
+    "source_code_uri" => "https://github.com/sneakin/ninep"
   }
   s.executables = [ 'bin/ninep' ]
   s.require_paths = [ 'lib' ]
