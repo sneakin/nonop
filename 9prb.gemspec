@@ -1,5 +1,5 @@
 Gem::Specification.new do |s|
-  s.name        = '9prb'
+  s.name        = 'ninep'
   s.version     = '0.1.0'
   s.licenses    = ['MIT']
   s.summary     = "A pure Ruby 9p library."
@@ -11,7 +11,7 @@ Gem::Specification.new do |s|
   s.metadata    = {
     "source_code_uri" => "https://github.com/sneakin/9prb"
   }
-  s.executables = [ 'bin/9pserve' ]
+  s.executables = [ 'bin/ninep' ]
   s.require_paths = [ 'lib' ]
   s.add_dependency 'sg'
   s.add_dependency 'rdoc'

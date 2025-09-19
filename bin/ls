@@ -24,6 +24,12 @@ def vputs(*)
 end
 
 opts = OptionParser.new do |o|
+  desc = 'List a directory from a file server.'
+  o.banner += "\n\n" + desc + "\n"
+  o.on('--help-banner') do
+    puts(desc)
+    exit(0)
+  end
   o.on('-v', '--verbose') do
     $verbose = true
   end

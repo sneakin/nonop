@@ -6,4 +6,5 @@ using SG::Ext
 
 require 'sg/meta-command'
 
-SG::MetaCommand.new(File.dirname(__FILE__)).run
+SG::MetaCommand.new(File.dirname(__FILE__),
+                    banner_argument: '--help-banner').run
