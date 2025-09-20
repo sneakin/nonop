@@ -24,6 +24,7 @@ module NineP
           else
             client.request(NineP::L2000::Topen.new(fid: @fid,
                                                    flags: @flags)) do |pkt|
+              client.track_fid(@fid) { self.close }
               @ready = true
               blk&.call(self)
             end
@@ -47,7 +48,11 @@ module NineP
     end
     
     def close
-      client.clunk(fid)
+      client.clunk(fid) do |reply|
+        raise reply if StandardError === reply
+        @fid = nil
+      end
+      @ready = false
       self
     end
 

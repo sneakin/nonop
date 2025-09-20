@@ -16,6 +16,7 @@ module NineP
       @next_fid = 0
       @afid = -1
       @open_fids = {}
+      @free_fids = []
     end
     
     def read_one
@@ -65,11 +66,19 @@ module NineP
     end
 
     def next_fid
+      f = @free_fids.pop
+      return f if f
       @next_fid = (@next_fid + 1) & 0xFFFF
     end
 
     def track_fid fid, &blk
       @open_fids[fid] = blk || lambda { self.clunk(fid) }
+    end
+
+    def free_fid fid
+      @open_fids.delete(fid)
+      @free_fids.push(fid)
+      self
     end
     
     def next_tag
@@ -144,11 +153,21 @@ module NineP
     end
 
     def clunk fid, async: nil, &blk
-      @open_fids.delete(fid) # todo call this? default calls back.
-      request(NineP::Tclunk.new(fid: fid),
-              wait_for: async != true && blk == nil,
-              &blk)
-      self
+      free_fid(fid) # todo call this? default calls back.
+      result = request(NineP::Tclunk.new(fid: fid),
+              wait_for: async != true && blk == nil) do |reply|
+        case reply
+        when ErrorPayload then blk&.call(maybe_wrap_error(reply, ClunkError))
+        when Rclunk then blk&.call(reply)
+        else raise TypeError.new(reply.class)
+        end
+      end
+
+      if blk || async
+        self
+      else
+        result
+      end
     end
 
     def attach(**opts, &blk)
