@@ -73,7 +73,7 @@ module NineP
 
     def walk path, nfid: nil, wait_for: nil, &blk
       nfid ||= client.next_fid
-      path = path.split('/') if String === path
+      path = RemotePath.new(path)
       result = client.request(NineP::Twalk.new(fid: fid,
                                                newfid: nfid,
                                                wnames: path.collect { NineP::NString.new(_1) }),
@@ -83,7 +83,7 @@ module NineP
           client.track_fid(nfid)
           blk&.call(pkt)
         when ErrorPayload then
-          err = WalkError.new(pkt, path.join('/'))
+          err = WalkError.new(pkt, path)
           blk&.call(err)
           return err if wait_for
         else err = TypeError.new(pkt.class)

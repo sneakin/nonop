@@ -1,3 +1,10 @@
+require 'sg/ext'
+using SG::Ext
+
+require_relative '../async'
+require_relative '../util'
+require_relative '../remote-path'
+
 module NineP
   class RemoteDir
     READ_SIZE = 4096
@@ -5,7 +12,7 @@ module NineP
     attr_reader :path, :attachment, :flags, :fid
     
     def initialize path, attachment:, flags: nil, fid: nil, &blk
-      @path = path.empty?? [] : path.split('/')
+      @path = RemotePath.new(path)
       @attachment = attachment
       @flags = flags || NineP::L2000::Topen::Flags[:DIRECTORY]
       @fid = fid || client.next_fid
@@ -13,7 +20,7 @@ module NineP
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
-            blk&.call(WalkError.new(2, @path[0, pkt.nwqid].join('/')))
+            blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
           else
             client.request(NineP::L2000::Topen.new(fid: @fid,
                                                    flags: @flags)) do |pkt|

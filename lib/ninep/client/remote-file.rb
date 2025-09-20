@@ -3,13 +3,14 @@ using SG::Ext
 
 require_relative '../async'
 require_relative '../util'
+require_relative '../remote-path'
 
 module NineP
   class RemoteFile
     attr_reader :attachment, :path, :flags, :fid
     
     def initialize path, attachment:, flags: nil, fid: nil, mode: nil, gid: nil, &blk
-      @path = path.empty?? [] : path.split('/')
+      @path = RemotePath.new(path)
       @attachment = attachment
       @flags = L2000::Topen.flag_mask(flags || [:RDONLY])
       @fid = fid || client.next_fid
@@ -30,7 +31,7 @@ module NineP
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
-            blk&.call(WalkError.new(2, @path[0, pkt.nwqid].join('/')))
+            blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
           else
             client.track_fid(@fid) do
               @ready = false
@@ -46,11 +47,11 @@ module NineP
               end
             end
           end
-        when ErrorPayload then
+        when StandardError then
           if 0 != (@flags & NineP::L2000::Topen::Flags[:CREATE])
             create(mode: mode, gid: gid, &blk)
           else
-            blk&.call(WalkError.new(pkt, @path.join('/')))
+            blk&.call(pkt)
           end
         else blk&.call(TypeError.new(pkt))
         end
@@ -66,16 +67,16 @@ module NineP
         case pkt
         when Rwalk then
           client.request(L2000::Tcreate.new(fid: @fid,
-                                            name: NString.new(@path.last),
+                                            name: NString.new(@path.basename),
                                             flags: @flags,
                                             mode: mode || 0644,
                                             gid: gid || 0)) do |pkt|
             case pkt
-            when ErrorPayload then blk&.call(CreateError.new(pkt, path.join('/')))
+            when ErrorPayload then blk&.call(CreateError.new(pkt, path))
             else blk&.call(self)
             end
           end
-        when ErrorPayload then blk&.call(WalkError.new(pkt, path.join('/')))
+        when ErrorPayload then blk&.call(WalkError.new(pkt, path))
         else raise TypeError.new(pkt)
         end
       end
@@ -87,6 +88,7 @@ module NineP
     end
 
     # todo length limited to msglen
+    # todo handling multiple replies for big reads
     def read length, offset: 0, &blk
       raise ArgumentError.new("Length %i must be 1...%i" % [ length, client.max_datalen ]) unless (1..client.max_datalen) === length
       raise ArgumentError.new("Offset must be positive") if offset < 0
