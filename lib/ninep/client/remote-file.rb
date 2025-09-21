@@ -16,7 +16,6 @@ module NineP
       @flags = L2000::Topen.flag_mask(flags || [:RDONLY])
       @fid = fid || client.next_fid
       @io = RemoteIO.new(client, @fid)
-
       open(mode: mode, gid: gid, &blk)
     end
 
@@ -40,9 +39,7 @@ module NineP
               blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
             end
           else
-            client.track_fid(@fid) do
-              close
-            end
+            client.track_fid(@fid) { self.close }
             client.request(NineP::L2000::Topen.new(fid: @fid,
                                                    flags: @flags)) do |pkt|
               if ErrorPayload === pkt
@@ -53,12 +50,7 @@ module NineP
               end
             end
           end
-        when StandardError then
-          if 0 != (@flags & NineP::L2000::Topen::Flags[:CREATE])
-            create(mode: mode, gid: gid, &blk)
-          else
-            blk&.call(pkt)
-          end
+        when StandardError then blk&.call(pkt)
         else blk&.call(TypeError.new(pkt))
         end
       end
@@ -72,9 +64,7 @@ module NineP
       attachment.walk(@path.parent, nfid: @fid) do |pkt|
         case pkt
         when Rwalk then
-          client.track_fid(@fid) do
-            close
-          end
+          client.track_fid(@fid) { self.close }
           client.request(L2000::Tcreate.new(fid: @fid,
                                             name: NString.new(@path.basename),
                                             flags: @flags,
@@ -101,17 +91,17 @@ module NineP
     # todo handling multiple replies for big reads
     def read length, offset: 0, &blk
       r = @io.read(length, offset:, &blk)
-      @io == r ? self : r
+      retself(r, @io)
     end
 
     def write data, offset: 0, length: nil, &blk
       r = @io.write(data, offset:, length:, &blk)
-      @io == r ? self : r
+      retself(r, @io)
     end
     
     def write_one data, offset: 0, &blk
       r = @io.write_one(data, offset:, &blk)
-      @io == r ? self : r
+      retself(r, @io)
     end
     
     def wrap_error_or_data pkt, error = Error
@@ -119,6 +109,10 @@ module NineP
       when ErrorPayload then error.new(pkt, path)
       else pkt.data
       end
+    end
+
+    def retself value, child
+      value.equal?(child) ? self : value
     end
   end
 end

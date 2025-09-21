@@ -16,27 +16,7 @@ module NineP
       @attachment = attachment
       @flags = flags || NineP::L2000::Topen::Flags[:DIRECTORY]
       @fid = fid || client.next_fid
-      attachment.walk(@path, nfid: @fid) do |pkt|
-        case pkt
-        when Rwalk then
-          if pkt.nwqid < @path.size
-            blk&.call(WalkError.new(2, @path.parent(pkt.nwqid + 1, from_top: true)))
-          else
-            client.request(NineP::L2000::Topen.new(fid: @fid,
-                                                   flags: @flags)) do |pkt|
-              if ErrorPayload === pkt
-                blk&.call(NineP.maybe_wrap_error(pkt, OpenError))
-              else
-                client.track_fid(@fid) { self.close }
-                @ready = true
-                blk&.call(self)
-              end
-            end
-          end
-        when StandardError then blk&.call(pkt)
-        else blk&.call(TypeError.new(pkt.class))
-        end
-      end
+      open_self(&blk)
     end
 
     def client
@@ -101,6 +81,43 @@ module NineP
       else
         NineP.maybe_wrap_error(result.data, MkdirError)
       end
-    end    
+    end
+
+    def walk_to_self &blk
+      attachment.walk(@path, nfid: @fid) do |pkt|
+        case pkt
+        when Rwalk then
+          if pkt.nwqid < @path.size
+            blk.call(WalkError.new(2, @path.parent(pkt.nwqid + 1, from_top: true)))
+          else
+            blk.call(pkt)
+          end
+        when StandardError then blk.call(pkt)
+        else blk.call(TypeError.new(pkt.class))
+        end
+      end
+    end
+    
+    def open_self &blk
+      return blk.call(self) if ready?
+      
+      walk_to_self do |pkt|
+        case pkt
+        when Rwalk then
+          client.request(NineP::L2000::Topen.new(fid: @fid,
+                                                 flags: @flags)) do |pkt|
+            if ErrorPayload === pkt
+              blk.call(NineP.maybe_wrap_error(pkt, OpenError))
+            else
+              client.track_fid(@fid) { self.close }
+              @ready = true
+              blk.call(self)
+            end
+          end
+        when StandardError then blk.call(pkt)
+        else blk.call(TypeError.new(pkt.class))
+        end
+      end
+    end
   end
 end
