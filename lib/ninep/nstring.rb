@@ -30,9 +30,13 @@ module NineP
     end
 
     def == other
+      0 == (self <=> other)
+    end
+
+    def <=> other
       case other
-      when self.class then value == other.value
-      else value == other.to_s
+      when self.class then value <=> other.value
+      else value <=> other.to_s
       end
     end
   end

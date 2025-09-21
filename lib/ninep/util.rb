@@ -24,7 +24,25 @@ module NineP
     end
   end
 
-  def self.maybe_call(proc, *args, **opts, &blk)
-    proc ? proc.call(*args, **opts, &blk) : args
+  def self.maybe_call(proc, ret, *args, **opts, &blk)
+    proc ? proc.call(ret, *args, **opts, &blk) :
+      (args.empty?? ret : [ ret, *args ])
+  end
+
+  class ComparableNil
+    include Singleton
+    include Comparable
+
+    def nil?
+      true
+    end
+    
+    def <=> other
+      other == nil ? 0 : 1
+    end
+
+    def coerce other
+      [ other, other ]
+    end
   end
 end

@@ -18,6 +18,8 @@ uname = ENV['USER']
 auth_creds = nil
 aname = '/'
 short_list = true
+sort_field = nil
+reverse_sort = false
 
 opts = OptionParser.new do |o|
   desc = 'List a directory from a file server.'
@@ -50,6 +52,12 @@ opts = OptionParser.new do |o|
   o.on('-l', '--long') do
     short_list = false
   end
+  o.on('-s', '--sort FIELD') do |v|
+    sort_field = v.to_sym
+  end
+  o.on('-R', '--reverse') do
+    reverse_sort = true
+  end
 end
 
 paths = opts.parse(ARGV)
@@ -66,7 +74,7 @@ Signal.trap('QUIT') do
   client.close
 end
 
-def dir_loop attachment, paths, max_name: 0, short_list: true, &blk
+def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, reverse_sort: false, &blk
   NineP::Async.reduce(paths) do |path, &cc|
     attachment.opendir(path) do |dir|
       if StandardError === dir
@@ -74,27 +82,45 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, &blk
         next cc.call(false, &blk)
       end
 
-      # todo triggers multiple readdir requests
-      new_max_name = 2 + dir.entries.collect { _1.name.to_s.size }.max
+      new_max_name = 0
+
+      ents = dir.entries(wait_for: true).collect do |ent|
+        new_max_name = [ new_max_name, ent.name.size ].max
+        if (sort_field && sort_field != :name) || !short_list
+          stats = if attachment.client.remote_version == NineP::L2000::Decoder::VERSION
+                    dir.getattr(ent.name.to_s)
+                  else
+                    dir.stat(ent.name.to_s)
+                  end
+          [ ent, stats ]
+        else
+          [ ent ]
+        end
+      end
+
+      new_max_name = 2 + new_max_name
       max_name = new_max_name if max_name < new_max_name
-      dir.entries(wait_for: true) do |ent|
-        ent_stats = unless short_list
-                      NineP.vputs :hello, attachment.client.remote_version
-                      if attachment.client.remote_version == NineP::L2000::Decoder::VERSION
-                        dir.getattr(ent.name.to_s)
-                      else
-                        dir.stat(ent.name.to_s)
-                      end
-                    end
-        if ent_stats == nil
-          puts("  \e[1m%-*s\e[0m" %
-               [ max_name, ent.name.to_s ])
-        elsif StandardError === ent_stats
+      
+      ents = if sort_field == :name
+               ents.sort_by { _1[0].name }
+             elsif sort_field
+               ents.sort_by { NineP::Packet::Data === _1[1] ? _1[1].send(sort_field) : NineP::ComparableNil.instance }
+             else
+               ents
+             end
+      if reverse_sort
+        ents = ents.reverse
+      end
+      ents.each do |ent, ent_stats|
+        if StandardError === ent_stats
           puts("  \e[1m%-*s\e[0m %s" %
                [ max_name, ent.name.to_s, ent_stats ])
-        else
+        elsif ent_stats && !short_list
           puts("  \e[1m%-*s \e[0;37m%8i %6o %8s %8s %18s\e[0m" %
                [ max_name, ent.name.to_s, ent_stats.size, ent_stats.mode, ent_stats.uid, ent_stats.gid, Time.at(ent_stats.mtime_sec).strftime("%x %X") ])
+        else
+          puts("  \e[1m%-*s\e[0m" %
+               [ max_name, ent.name.to_s ])
         end
       end
 
@@ -108,7 +134,10 @@ client.start do |pkt|
     client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
       raise attachment if StandardError === attachment
 
-      dir_loop(attachment, paths, short_list: short_list) do
+      dir_loop(attachment, paths,
+               short_list: short_list,
+               sort_field: sort_field,
+               reverse_sort: reverse_sort) do
         client.close
       end
     end
