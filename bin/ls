@@ -53,7 +53,13 @@ opts = OptionParser.new do |o|
     short_list = false
   end
   o.on('-s', '--sort FIELD') do |v|
-    sort_field = v.to_sym
+    v = v.to_sym
+    fields = [ :name, *NineP::L2000::Rgetattr.members ]
+    if fields.include?(v)
+      sort_field = v
+    else
+      raise ArgumentError.new("#{v} is not a valid field. Try: #{fields.collect(&:to_s).join(', ')}")
+    end
   end
   o.on('-R', '--reverse') do
     reverse_sort = true
