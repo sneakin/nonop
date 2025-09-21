@@ -20,13 +20,17 @@ module NineP
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
-            blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
+            blk&.call(WalkError.new(2, @path.parent(pkt.nwqid + 1, from_top: true)))
           else
             client.request(NineP::L2000::Topen.new(fid: @fid,
                                                    flags: @flags)) do |pkt|
-              client.track_fid(@fid) { self.close }
-              @ready = true
-              blk&.call(self)
+              if ErrorPayload === pkt
+                blk&.call(NineP.maybe_wrap_error(pkt, OpenError))
+              else
+                client.track_fid(@fid) { self.close }
+                @ready = true
+                blk&.call(self)
+              end
             end
           end
         when StandardError then blk&.call(pkt)
