@@ -22,5 +22,9 @@ module NineP
         y << block
       end
     end
-  end  
+  end
+
+  def self.maybe_call(proc, *args, **opts, &blk)
+    proc ? proc.call(*args, **opts, &blk) : args
+  end
 end

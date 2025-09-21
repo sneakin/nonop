@@ -83,6 +83,14 @@ module NineP
       end
     end
 
+    def getattr entry, &blk
+      attachment.getattr(entry, fid: fid, &blk)
+    end
+    
+    def stat entry, &blk
+      attachment.stat(entry, &blk)
+    end
+    
     def walk_to_self &blk
       attachment.walk(@path, nfid: @fid) do |pkt|
         case pkt

@@ -14,6 +14,7 @@ require_relative 'messages/walk'
 require_relative 'messages/clunk'
 require_relative 'messages/remove'
 require_relative 'messages/stat'
+require_relative 'messages/wstat'
 require_relative 'messages/create'
 require_relative 'messages/open'
 require_relative 'messages/read'
@@ -58,6 +59,7 @@ module NineP
       120 => Tclunk, 121 => Rclunk,
       122 => Tremove, 123 => Rremove,
       124 => Tstat, 125 => Rstat,
+      126 => Twstat, 127 => Rwstat,
     }
 
     class DecodeError < RuntimeError

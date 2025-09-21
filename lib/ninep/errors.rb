@@ -32,4 +32,6 @@ module NineP
   end
   class MkdirError < ProtocolError
   end
+  class StatError < ProtocolError
+  end
 end

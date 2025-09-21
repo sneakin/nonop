@@ -56,13 +56,11 @@ module NineP
     def getattr(path, fid: nil, &blk)
       nfid ||= client.next_fid
       result = nil
-      walk(path, nfid: nfid, wait_for: blk == nil) do |walk|
-        if ErrorPayload === walk
-          err = NineP.maybe_wrap_error(walk, WalkError)
-          blk&.call(err)
-          return err
+      walk(path, fid: fid, nfid: nfid, wait_for: blk == nil) do |walk|
+        if StandardError === walk
+          return NineP.maybe_call(blk, walk)
         else
-          result = client.request(NineP::L2000::Tgetattr.new(fid: nfid),
+           result = client.request(NineP::L2000::Tgetattr.new(fid: nfid),
                                   wait_for: blk == nil) do |pkt|
             client.clunk(nfid)
             blk&.call(NineP.maybe_wrap_error(pkt, GetAttrError))
@@ -70,39 +68,46 @@ module NineP
         end
       end
 
-      if blk
-        self
-      else
-        NineP.maybe_wrap_error(result.data, GetAttrError)
-      end
+      blk ? self : result.data
     end
 
-    def walk path, nfid: nil, wait_for: nil, &blk
+    def stat(path, fid: nil, &blk)
+      nfid ||= client.next_fid
+      result = nil
+      walk(path, fid: fid, nfid: nfid, wait_for: blk == nil) do |walk|
+        if StandardError === walk
+          return NineP.maybe_call(blk, walk)
+        else
+          result = client.request(NineP::Tstat.new(fid: nfid),
+                                  wait_for: blk == nil) do |pkt|
+            client.clunk(nfid)
+            blk&.call(NineP.maybe_wrap_error(pkt, StatError))
+          end
+        end
+      end
+
+      blk ? self : result.data
+    end
+
+    def walk path, nfid: nil, fid: nil, wait_for: nil, &blk
       nfid ||= client.next_fid
       path = RemotePath.new(path)
-      result = client.request(NineP::Twalk.new(fid: fid,
+      result = client.request(NineP::Twalk.new(fid: fid || self.fid,
                                                newfid: nfid,
                                                wnames: path.collect { NineP::NString.new(_1) }),
                               wait_for: wait_for) do |pkt|
         case pkt
         when Rwalk then
           client.track_fid(nfid)
-          blk&.call(pkt)
+          NineP.maybe_call(blk, pkt)
         when ErrorPayload then
-          err = WalkError.new(pkt, path)
-          blk&.call(err)
-          return err if wait_for
-        else err = TypeError.new(pkt.class)
-          blk&.call(err)
-          return err if wait_for
+          return NineP.maybe_call(blk, WalkError.new(pkt, path))
+        else
+          return NineP.maybe_call(blk, TypeError.new(pkt.class))
         end
       end
 
-      if blk
-        self
-      else
-        result
-      end
+      blk ? self : result.data
     end
   end
 
