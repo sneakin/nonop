@@ -36,6 +36,8 @@ require_relative 'messages/2000L/rename'
 
 module NineP
   class Decoder
+    VERSION = '9P2000.U'
+    
     MIN_MSGLEN = 128
     MAX_MSGLEN = 65535
 
@@ -71,21 +73,18 @@ module NineP
       end
     end
 
-    attr_reader :packet_types, :packet_types_inv
+    attr_reader :version, :packet_types, :packet_types_inv
     attr_accessor :max_msglen
     
-    def initialize coders: nil, max_msglen: nil
+    def initialize coders: nil, version: nil, max_msglen: nil
       raise ArgumentError.new("max_msglen must be > #{MIN_MSGLEN}") if max_msglen && max_msglen <= MIN_MSGLEN
+      @version = version || VERSION
       @max_msglen = max_msglen || MAX_MSGLEN
       @packet_types = Hash.new(NopDecoder)
       @packet_types_inv = Hash.new(NopDecoder)
       add_packet_types(coders) unless coders&.empty?
     end
 
-    def version
-      '9P2000.L'
-    end
-    
     def max_datalen
       max_msglen - MIN_MSGLEN # Packet.attribute_offset(:raw_data)
     end
@@ -148,6 +147,8 @@ module NineP
 
   module L2000
     class Decoder < NineP::Decoder
+      VERSION = '9P2000.L'
+      
       RequestReplies = {
         7 => L2000::Rerror,
         8 => Tstatfs, 9 => Rstatfs,
@@ -167,7 +168,8 @@ module NineP
       }
 
       def initialize **opts
-        super(**opts.merge(coders: NineP::Decoder::RequestReplies.merge(RequestReplies)))
+        super(**opts.merge(coders: NineP::Decoder::RequestReplies.merge(RequestReplies),
+                           version: VERSION))
       end
     end
   end
