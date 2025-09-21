@@ -46,6 +46,10 @@ module NineP
                        separator: separator)
       end
     end
+
+    def join *new_parts
+      self.class.new(parts + new_parts, separator: separator)
+    end
   end
 end
 

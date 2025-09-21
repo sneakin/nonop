@@ -79,7 +79,12 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, &blk
       max_name = new_max_name if max_name < new_max_name
       dir.entries(wait_for: true) do |ent|
         ent_stats = unless short_list
-                      attachment.getattr(path + '/' + ent.name.to_s)
+                      NineP.vputs :hello, attachment.client.remote_version
+                      if attachment.client.remote_version == NineP::L2000::Decoder::VERSION
+                        dir.getattr(ent.name.to_s)
+                      else
+                        dir.stat(ent.name.to_s)
+                      end
                     end
         if ent_stats == nil
           puts("  \e[1m%-*s\e[0m" %

@@ -137,6 +137,14 @@ module NineP
       self
     end
 
+    def local_version
+      coder.version
+    end
+
+    def remote_version
+      server_info[:version]
+    end
+
     def auth uname:, n_uname:, aname:, credentials:, &blk
       # Authenticating with Diode requires sending an Auth packet
       # followed by attaching to the live afid. This is followed by

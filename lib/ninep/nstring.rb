@@ -28,5 +28,12 @@ module NineP
     def to_s
       value
     end
+
+    def == other
+      case other
+      when self.class then value == other.value
+      else value == other.to_s
+      end
+    end
   end
 end
