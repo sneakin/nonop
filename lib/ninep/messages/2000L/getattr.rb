@@ -8,11 +8,24 @@ module NineP
   module L2000
     class Tgetattr
       Flags = {
-        BASIC:           0x000007ff,
-        ALL:             0x00003fff,
+        BASIC:        0x000007ff,
+        ALL:          0x00003fff,
+        MODE:         0x00000001,
+        NLINK:        0x00000002,
+        UID:          0x00000004,
+        GID:          0x00000008,
+        RDEV:         0x00000010,
+        ATIME:        0x00000020,
+        MTIME:        0x00000040,
+        CTIME:        0x00000080,
+        INO:          0x00000100,
+        SIZE:         0x00000200,
+        BLOCKS:       0x00000400,
+        BTIME:        0x00000800,
+        GEN:          0x00001000,
+        DATA_VERSION: 0x00002000,
       }
       
-      ID = 24
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:request_mask, :uint64l])
@@ -20,7 +33,6 @@ module NineP
     end
 
     class Rgetattr
-      ID = 25
       include Packet::Data
       define_packing([ :valid, :uint64l ],
                      [ :qid, Qid ],

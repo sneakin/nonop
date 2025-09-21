@@ -22,10 +22,6 @@ module NineP
       @coder || data&.class
     end
     
-    def type
-      @type || coder.type_id
-    end
-    
     def pack
       @raw_data = @data.pack if @data
       super

@@ -6,20 +6,19 @@ require_relative '../../qid'
 
 module NineP
   module L2000
-    class Tcreate
+    class Tmknod
       include Packet::Data
-      define_packing([:fid, :uint32l],
-                     [:name, NString ],
-                     [:flags, :uint32l],
+      define_packing([:dfid, :uint32l],
+                     [:name, NString],
                      [:mode, :uint32l],
+                     [:major, :uint32l],
+                     [:minor, :uint32l],
                      [:gid, :uint32l])
-
     end
 
-    class Rcreate
+    class Rmknod
       include Packet::Data
-      define_packing([:qid, Qid ],
-                     [:iounit, :uint32l])
+      define_packing([:qid, Qid])
     end
   end
 end

@@ -8,7 +8,6 @@ module NineP
   module L2000
     class Treaddir
       # size[4] Treaddir tag[2] fid[4] offset[8] count[4]
-      ID = 40
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:offset, :uint64l],
@@ -26,7 +25,6 @@ module NineP
                        [:name, NString])
       end
       # size[4] Rreaddir tag[2] count[4] data[count]
-      ID = 41
       include Packet::Data
       define_packing([:count, :uint32l],
                      [:data, :string, :count])

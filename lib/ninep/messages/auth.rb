@@ -7,7 +7,6 @@ require_relative '../qid'
 
 module NineP
   class Tauth
-    ID = 102
     include Packet::Data
     define_packing([:afid, :uint32l],
                    [:uname, NString],
@@ -15,7 +14,6 @@ module NineP
   end
   
   class Rauth
-    ID = 103
     include Packet::Data
     define_packing([:aqid, Qid])
   end

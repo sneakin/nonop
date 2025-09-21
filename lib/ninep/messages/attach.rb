@@ -7,7 +7,6 @@ require_relative 'packet-data'
 
 module NineP
   class Tattach
-    ID = 104
     include Packet::Data
     define_packing([:fid, :uint32l],
                    [:afid, :uint32l],
@@ -16,7 +15,6 @@ module NineP
   end
 
   class Rattach
-    ID = 105
     include Packet::Data
     define_packing([:aqid, Qid])
   end

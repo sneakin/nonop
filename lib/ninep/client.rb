@@ -173,5 +173,9 @@ module NineP
     def attach(**opts, &blk)
       Attachment.new(**opts.merge(client: self), &blk)
     end
+
+    def flush_tag oldtag, &blk
+      request(Tflush.new(oldtag: oldtag), &blk)
+    end
   end
 end

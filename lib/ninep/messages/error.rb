@@ -16,7 +16,6 @@ module NineP
   end
   
   class Rerror < ErrorPayload
-    ID = 107
     include Packet::Data
     define_packing([:code, :uint32l])
   end

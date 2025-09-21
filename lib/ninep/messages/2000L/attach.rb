@@ -7,7 +7,6 @@ require_relative '../../nstring'
 module NineP
   module L2000
     class Tattach
-      ID = 104
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:afid, :uint32l],

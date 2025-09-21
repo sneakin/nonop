@@ -14,6 +14,7 @@ require_relative 'messages/remove'
 require_relative 'messages/stat'
 require_relative 'messages/read'
 require_relative 'messages/write'
+require_relative 'messages/flush'
 
 require_relative 'messages/2000L/error'
 require_relative 'messages/2000L/auth'
@@ -22,22 +23,31 @@ require_relative 'messages/2000L/open'
 require_relative 'messages/2000L/create'
 require_relative 'messages/2000L/readdir'
 require_relative 'messages/2000L/getattr'
+require_relative 'messages/2000L/setattr'
+require_relative 'messages/2000L/statfs'
+require_relative 'messages/2000L/symlink'
+require_relative 'messages/2000L/readlink'
+require_relative 'messages/2000L/mknod'
+require_relative 'messages/2000L/rename'
 
 module NineP
   class Decoder
     MIN_MSGLEN = 128
     MAX_MSGLEN = 65535
-    RequestReplies = [ [ Tversion, Rversion ],
-                       [ Tattach, Rattach ],
-                       [ nil, Rerror ],
-                       [ Tauth, Rauth ],
-                       [ Tclunk, Rclunk ],
-                       [ Twalk, Rwalk ],
-                       [ Tremove, Rremove ],
-                       [ Tstat, Rstat ],
-                       [ Tread, Rread ],
-                       [ Twrite, Rwrite ],
-                     ]
+
+    RequestReplies = {
+      100 => Tversion, 101 => Rversion,
+      102 => Tauth, 103 => Rauth,
+      104 => Tattach, 105 => Rattach,
+      107 => Rerror,
+      108 => Tflush, 109 => Rflush,
+      110 => Twalk, 111 => Rwalk,
+      116 => Tread, 117 => Rread,
+      118 => Twrite, 119 => Rwrite,
+      120 => Tclunk, 121 => Rclunk,
+      122 => Tremove, 123 => Rremove,
+      124 => Tstat, 125 => Rstat,
+    }
 
     class DecodeError < RuntimeError
       include SG::AttrStruct
@@ -57,13 +67,14 @@ module NineP
       end
     end
 
-    attr_reader :packet_types
+    attr_reader :packet_types, :packet_types_inv
     attr_accessor :max_msglen
     
     def initialize coders: nil, max_msglen: nil
       raise ArgumentError.new("max_msglen must be > #{MIN_MSGLEN}") if max_msglen && max_msglen <= MIN_MSGLEN
       @max_msglen = max_msglen || MAX_MSGLEN
       @packet_types = Hash.new(NopDecoder)
+      @packet_types_inv = Hash.new(NopDecoder)
       add_packet_types(coders) unless coders&.empty?
     end
 
@@ -82,6 +93,7 @@ module NineP
     end
 
     def send_one pkt, io
+      pkt.type = @packet_types_inv[pkt.coder]
       data = pkt.pack
       io.write(data)
     end
@@ -112,6 +124,7 @@ module NineP
     
     def add_packet_type id, packer
       packet_types[id] = packer
+      packet_types_inv[packer] = id
       self
     end
     
@@ -129,24 +142,24 @@ module NineP
 
   module L2000
     class Decoder < NineP::Decoder
-      RequestReply = [ [ Tversion, Rversion ],
-                       [ Tattach, Rattach ],
-                       [ nil, NineP::Rerror ],
-                       [ nil, L2000::Rerror ],
-                       [ Tauth, Rauth ],
-                       [ Tclunk, Rclunk ],
-                       [ Twalk, Rwalk ],
-                       [ Tread, Rread ],
-                       [ Twrite, Rwrite ],
-                       [ Tremove, Rremove ],
-                       [ Tstat, Rstat ],
-                       [ Topen, Ropen ],
-                       [ Tcreate, Rcreate ],
-                       [ Treaddir, Rreaddir ],
-                       [ Tgetattr, Rgetattr]
-                     ]
+      RequestReplies = {
+        7 => Rerror,
+        8 => Tstatfs, 9 => Rstatfs,
+        12 => Topen, 13 => Ropen,
+        14 => Tcreate, 15 => Rcreate,
+        16 => Tsymlink, 17 => Rsymlink,
+        18 => Tmknod, 19 => Rmknod,
+        20 => Trename, 21 => Rrename,
+        22 => Treadlink, 23 => Rreadlink,
+        24 => Tgetattr, 25 => Rgetattr,
+        26 => Tsetattr, 27 => Rsetattr,
+        40 => Treaddir, 41 => Rreaddir,
+        102 => Tauth, 103 => Rauth,
+        104 => Tattach, 105 => Rattach,
+      }
+
       def initialize **opts
-        super(**opts.merge(coders: RequestReply.flatten.reject(&:nil?)))
+        super(**opts.merge(coders: NineP::Decoder::RequestReplies.merge(RequestReplies)))
       end
     end
   end

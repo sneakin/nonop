@@ -4,12 +4,12 @@ using SG::Ext
 require_relative 'packet-data'
 
 module NineP
-  class Tclunk
+  class Tflush
     include Packet::Data
-    define_packing([:fid, :uint32l])
+    define_packing([:oldtag, :uint16l])
   end
 
-  class Rclunk
+  class Rflush
     include Packet::Data
     define_packing()
   end
