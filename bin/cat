@@ -6,6 +6,7 @@ using SG::Ext
 
 require 'socket'
 require 'ninep'
+require 'munge'
 
 if $0 == __FILE__
   require 'optparse'
@@ -38,6 +39,9 @@ if $0 == __FILE__
     end
     o.on('--auth-creds CREDS') do |v|
       auth_creds = v
+    end
+    o.on('-n', '--no-auth') do
+      auth_creds = false
     end
     o.on('-e', '--aname NAME') do |v|
       aname = v
@@ -109,8 +113,13 @@ if $0 == __FILE__
       end
     end
 
-    if uid && auth_creds
-      client.auth(uname: uname, aname: aname, n_uname: uid, credentials: auth_creds, &main_loop)
+    if uid && auth_creds != false
+      auth_creds ||= Munge.encode(uid: uid)
+      client.auth(uname: uname,
+                  aname: aname,
+                  n_uname: uid,
+                  credentials: auth_creds,
+                  &main_loop)
     else
       main_loop.call
     end

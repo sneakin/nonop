@@ -6,6 +6,7 @@ using SG::Ext
 
 require 'socket'
 require 'ninep'
+require 'munge'
 
 if $0 == __FILE__
 require 'optparse'
@@ -37,6 +38,9 @@ opts = OptionParser.new do |o|
   end
   o.on('--auth-creds DATA') do |v|
     auth_creds = v
+  end
+  o.on('-n', '--no-auth') do
+    auth_creds = false
   end
   o.on('-e', '--aname NAME') do |v|
     aname = v
@@ -103,7 +107,8 @@ client.start do |pkt|
     end
   end
   
-  if uid && auth_creds
+  if uid && auth_creds != false
+    auth_creds ||= Munge.encode(uid: uid)
     NineP.vputs("Authenticating #{uid} with #{auth_creds.inspect}")
     client.auth(uname: uname,
                 aname: aname,
