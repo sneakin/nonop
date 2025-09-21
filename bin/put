@@ -12,6 +12,7 @@ require 'optparse'
 $verbose = false
 host = 'localhost'
 port = 564
+coder = nil
 uid = Process.uid
 uname = ENV['USER']
 auth_creds = nil
@@ -31,6 +32,9 @@ opts = OptionParser.new do |o|
   end
   o.on('-v', '--verbose') do
     $verbose = true
+  end
+  o.on('-p', '--protocol NAWE') do |v|
+    coder = v
   end
   o.on('--gid INTEGER', Integer) do |v|
     gid = v.to_i
@@ -70,8 +74,8 @@ paths = opts.parse(ARGV)
 paths << '' if paths.empty?
 
 sock = TCPSocket.new(host, port)
-client = NineP::Client.new(coder: NineP::L2000::Decoder.new(max_msglen: max_packet_size),
-                           io: sock)
+coder = NineP.coder_for(coder, max_msglen: max_packet_size)
+client = NineP::Client.new(coder: coder, io: sock)
 
 Signal.trap('INT') do
   client.close

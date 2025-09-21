@@ -44,6 +44,7 @@ module NineP
     MAX_MSGLEN = 65535
 
     RequestReplies = {
+      7 => L2000::Rerror,
       100 => Tversion, 101 => Rversion,
       102 => Tauth, 103 => Rauth,
       104 => Tattach, 105 => Rattach,
@@ -86,7 +87,7 @@ module NineP
       @max_msglen = max_msglen || MAX_MSGLEN
       @packet_types = Hash.new(NopDecoder)
       @packet_types_inv = Hash.new(NopDecoder)
-      add_packet_types(coders) unless coders&.empty?
+      add_packet_types(coders || RequestReplies)
     end
 
     def max_datalen
@@ -176,5 +177,15 @@ module NineP
                            version: VERSION))
       end
     end
+  end
+
+  Coders = {
+    '9P' => Decoder,
+    Decoder::VERSION => Decoder,
+    L2000::Decoder::VERSION => L2000::Decoder
+  }
+
+  def self.coder_for name, **opts
+    Coders.fetch(name || L2000::Decoder::VERSION).new(**opts)
   end
 end
