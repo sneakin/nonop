@@ -7,123 +7,121 @@ using SG::Ext
 require 'socket'
 require 'ninep'
 require 'munge'
+require 'optparse'
 
-if $0 == __FILE__
-  require 'optparse'
+$verbose = false
+host = 'localhost'
+port = 564
+uid = Process.uid
+uname = ENV['USER']
+auth_creds = nil
+aname = '/'
+buffer_size = 4096
 
-  $verbose = false
-  host = 'localhost'
-  port = 564
-  uid = Process.uid
-  uname = ENV['USER']
-  auth_creds = nil
-  aname = '/'
-  buffer_size = 4096
-
-  opts = OptionParser.new do |o|
-    desc = 'Read a file from a file server.'
-    o.banner += "\n\n" + desc + "\n\n"
-    o.on('-H', '--help-banner') do
-      puts(desc)
-      exit(0)
-    end
-    o.on('-v', '--verbose') do
-      $verbose = true
-    end
-    o.on('-u', '--uname NAME') do |v|
-      uname = v
-    end
-    o.on('--uid INTEGER', Integer) do |v|
-      uid = v.to_i
-      uid = nil if uid < 0
-    end
-    o.on('--auth-creds CREDS') do |v|
-      auth_creds = v
-    end
-    o.on('-n', '--no-auth') do
-      auth_creds = false
-    end
-    o.on('-e', '--aname NAME') do |v|
-      aname = v
-    end
-    o.on('--buffer-size BYTES', Integer) do |v|
-      buffer_size = v
-    end
+opts = OptionParser.new do |o|
+  desc = 'Read a file from a file server.'
+  o.banner += "\n\n" + desc + "\n\n"
+  o.on('-H', '--help-banner') do
+    puts(desc)
+    exit(0)
   end
-
-  paths = opts.parse(ARGV)
-  paths << '' if paths.empty?
-
-  sock = TCPSocket.new(host, port)
-  client = NineP::Client.new(coder: NineP::L2000::Decoder.new,
-                             io: sock)
-
-  Signal.trap('INT') do
-    client.close
+  o.on('-v', '--verbose') do
+    $verbose = true
   end
-  Signal.trap('QUIT') do
-    client.close
+  o.on('-u', '--uname NAME') do |v|
+    uname = v
   end
+  o.on('--uid INTEGER', Integer) do |v|
+    uid = v.to_i
+    uid = nil if uid < 0
+  end
+  o.on('--auth-creds CREDS') do |v|
+    auth_creds = v
+  end
+  o.on('-n', '--no-auth') do
+    auth_creds = false
+  end
+  o.on('-e', '--aname NAME') do |v|
+    aname = v
+  end
+  o.on('--buffer-size BYTES', Integer) do |v|
+    buffer_size = v
+  end
+end
 
-  # A read loop
-  def read_fn file, offset, length, &blk
-    # todo move into RemoteFile?
-    NineP::Async.reduce(0.upto(NineP::MAX_U64), 0) do |count, offset, &cc|
-      file.read(length, offset: offset) do |data|
-        raise data if StandardError === data # todo where is it handled?
-        blk.call(data)
-        cc.call(data.bytesize < length, offset + data.bytesize) do |offset|
-          # Close the file
-          file.close
-          # Continue on
-          blk.call(nil)
-        end
+paths = opts.parse(ARGV)
+paths << '' if paths.empty?
+
+sock = TCPSocket.new(host, port)
+client = NineP::Client.new(coder: NineP::L2000::Decoder.new,
+                           io: sock)
+
+Signal.trap('INT') do
+  client.close
+end
+Signal.trap('QUIT') do
+  client.close
+end
+
+# A read loop
+def read_fn file, offset, length, &blk
+  # todo move into RemoteFile?
+  NineP::Async.reduce(0.upto(NineP::MAX_U64), 0) do |count, offset, &cc|
+    file.read(length, offset: offset) do |data|
+      raise data if StandardError === data # todo where is it handled?
+      blk.call(data)
+      cc.call(data.bytesize < length, offset + data.bytesize) do |offset|
+        # Close the file
+        file.close
+        # Continue on
+        blk.call(nil)
       end
     end
   end
-  
-  client.start do |pkt|
-    main_loop = lambda do |*a|
-      client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-        raise attachment if StandardError === attachment
-        # A loop through the paths but only after tte callbacks complete
-        NineP::Async.reduce(paths, []) do |path, counts, &cc|
-          attachment.open(path, flags: [:RDONLY]) do |file|
-            fin = lambda do |final_count|
-              NineP.vputs { paths.zip(final_count).to_a.inspect }
-              client.close
-            end
-            if StandardError === file
-              $stderr.puts(file.message)
-              cc.call(false, counts + [ file ], &fin)
-            else
-              count = 0
-              read_fn(file, 0, buffer_size) do |data|
-                if data
-                  $stdout.write(data)
-                  count += data.bytesize
-                else
-                  # next file
-                  cc.call(false, counts + [ count ], &fin)
-                end
+end
+
+client.start do |pkt|
+  main_loop = lambda do |*a|
+    client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+      raise attachment if StandardError === attachment
+      # A loop through the paths but only after tte callbacks complete
+      NineP::Async.reduce(paths, []) do |path, counts, &cc|
+        attachment.open(path, flags: [:RDONLY]) do |file|
+          fin = lambda do |final_count|
+            NineP.vputs { paths.zip(final_count).to_a.inspect }
+            client.close
+          end
+          if StandardError === file
+            $stderr.puts(file.message)
+            cc.call(false, counts + [ file ], &fin)
+          else
+            count = 0
+            read_fn(file, 0, buffer_size) do |data|
+              if data
+                $stdout.write(data)
+                count += data.bytesize
+              else
+                # next file
+                cc.call(false, counts + [ count ], &fin)
               end
             end
           end
         end
       end
     end
-
-    if uid && auth_creds != false
-      auth_creds ||= Munge.encode(uid: uid)
-      client.auth(uname: uname,
-                  aname: aname,
-                  n_uname: uid,
-                  credentials: auth_creds,
-                  &main_loop)
-    else
-      main_loop.call
-    end
   end
-  
-  client.read_loop
+
+  if uid && auth_creds != false
+    auth_creds ||= Munge.encode(uid: uid)
+    client.auth(uname: uname,
+                aname: aname,
+                n_uname: uid,
+                credentials: auth_creds,
+                &main_loop)
+  else
+    main_loop.call
+  end
 end
+
+client.read_loop
+

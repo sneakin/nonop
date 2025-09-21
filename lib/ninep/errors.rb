@@ -30,4 +30,6 @@ module NineP
   end
   class GetAttrError < ProtocolError
   end
+  class MkdirError < ProtocolError
+  end
 end

@@ -30,6 +30,8 @@ require_relative 'messages/2000L/statfs'
 require_relative 'messages/2000L/symlink'
 require_relative 'messages/2000L/readlink'
 require_relative 'messages/2000L/mknod'
+require_relative 'messages/2000L/mkdir'
+require_relative 'messages/2000L/link'
 require_relative 'messages/2000L/rename'
 
 module NineP
@@ -158,6 +160,8 @@ module NineP
         24 => Tgetattr, 25 => Rgetattr,
         26 => Tsetattr, 27 => Rsetattr,
         40 => Treaddir, 41 => Rreaddir,
+        70 => Tlink, 71 => Rlink,
+        72 => Tmkdir, 73 => Rmkdir,
         102 => L2000::Tauth, 103 => L2000::Rauth,
         104 => Tattach, 105 => Rattach,
       }

@@ -25,6 +25,8 @@ module NineP
       parts.join(separator)
     end
 
+    alias to_s to_str
+
     include Enumerable
     
     def each &blk

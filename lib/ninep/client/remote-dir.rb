@@ -82,5 +82,21 @@ module NineP
         blk.call(NineP.maybe_wrap_error(result, ReadError))
       end
     end
+
+    def mkdir path, mode: nil, gid: nil, &blk
+      result = client.request(NineP::L2000::Tmkdir.
+                              new(dfid: fid,
+                                  name: NString.new(path.to_str),
+                                  mode: mode || 0755, \
+                                  gid: gid || Process.gid),
+                              wait_for: blk == nil) do |pkt|
+        blk&.call(NineP.maybe_wrap_error(pkt, MkdirError))
+      end
+      if blk
+        self
+      else
+        NineP.maybe_wrap_error(result.data, MkdirError)
+      end
+    end    
   end
 end

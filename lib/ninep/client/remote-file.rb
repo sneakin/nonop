@@ -33,7 +33,12 @@ module NineP
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
-            blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
+            client.clunk(@fid)
+            if 0 != (@flags & NineP::L2000::Topen::Flags[:CREATE])
+              create(mode: mode, gid: gid, &blk)
+            else
+              blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
+            end
           else
             client.track_fid(@fid) do
               close
@@ -64,9 +69,12 @@ module NineP
     end
 
     def create mode: nil, gid: nil, &blk
-      attachment.walk([], nfid: @fid) do |pkt|
+      attachment.walk(@path.parent, nfid: @fid) do |pkt|
         case pkt
         when Rwalk then
+          client.track_fid(@fid) do
+            close
+          end
           client.request(L2000::Tcreate.new(fid: @fid,
                                             name: NString.new(@path.basename),
                                             flags: @flags,
