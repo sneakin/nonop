@@ -13,15 +13,16 @@ if $0 == __FILE__
   $verbose = false
   host = 'localhost'
   port = 564
-  uid = 0
-  uname = ''
+  uid = Process.uid
+  uname = ENV['USER']
+  auth_creds = nil
   aname = '/'
   buffer_size = 4096
 
   opts = OptionParser.new do |o|
     desc = 'Read a file from a file server.'
     o.banner += "\n\n" + desc + "\n\n"
-    o.on('--help-banner') do
+    o.on('-H', '--help-banner') do
       puts(desc)
       exit(0)
     end
@@ -34,6 +35,9 @@ if $0 == __FILE__
     o.on('--uid INTEGER', Integer) do |v|
       uid = v.to_i
       uid = nil if uid < 0
+    end
+    o.on('--auth-creds CREDS') do |v|
+      auth_creds = v
     end
     o.on('-e', '--aname NAME') do |v|
       aname = v
@@ -75,38 +79,42 @@ if $0 == __FILE__
   end
   
   client.start do |pkt|
-    if uid
-      client.auth(uname: uname, aname: aname, n_uname: uid)
-    end
-
-   client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-      raise attachment if StandardError === attachment
-      # A loop through the paths but only after tte callbacks complete
-      NineP::Async.reduce(paths, []) do |path, counts, &cc|
-        attachment.open(path, flags: [:RDONLY]) do |file|
-          fin = lambda do |final_count|
-            NineP.vputs { paths.zip(final_count).to_a.inspect }
-            client.close
-          end
-          if StandardError === file
-            $stderr.puts(file.message)
-            cc.call(false, counts + [ file ], &fin)
-          else
-            count = 0
-            read_fn(file, 0, buffer_size) do |data|
-              if data
-                $stdout.write(data)
-                count += data.bytesize
-              else
-                # next file
-                cc.call(false, counts + [ count ], &fin)
+    main_loop = lambda do |*a|
+      client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+        raise attachment if StandardError === attachment
+        # A loop through the paths but only after tte callbacks complete
+        NineP::Async.reduce(paths, []) do |path, counts, &cc|
+          attachment.open(path, flags: [:RDONLY]) do |file|
+            fin = lambda do |final_count|
+              NineP.vputs { paths.zip(final_count).to_a.inspect }
+              client.close
+            end
+            if StandardError === file
+              $stderr.puts(file.message)
+              cc.call(false, counts + [ file ], &fin)
+            else
+              count = 0
+              read_fn(file, 0, buffer_size) do |data|
+                if data
+                  $stdout.write(data)
+                  count += data.bytesize
+                else
+                  # next file
+                  cc.call(false, counts + [ count ], &fin)
+                end
               end
             end
           end
         end
       end
     end
-  end
 
+    if uid && auth_creds
+      client.auth(uname: uname, aname: aname, n_uname: uid, credentials: auth_creds, &main_loop)
+    else
+      main_loop.call
+    end
+  end
+  
   client.read_loop
 end

@@ -13,15 +13,16 @@ require 'optparse'
 $verbose = false
 host = 'localhost'
 port = 564
-uid = 0
-uname = ''
+uid = Process.uid
+uname = ENV['USER']
+auth_creds = nil
 aname = '/'
 short_list = true
 
 opts = OptionParser.new do |o|
   desc = 'List a directory from a file server.'
   o.banner += "\n\n" + desc + "\n\n"
-  o.on('--help-banner') do
+  o.on('-H', '--help-banner') do
     puts(desc)
     exit(0)
   end
@@ -33,6 +34,9 @@ opts = OptionParser.new do |o|
   end
   o.on('--uid INTEGER') do |v|
     uid = v.to_i
+  end
+  o.on('--auth-creds DATA') do |v|
+    auth_creds = v
   end
   o.on('-e', '--aname NAME') do |v|
     aname = v
@@ -89,16 +93,25 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, &blk
 end
 
 client.start do |pkt|
-  if uid
-    client.auth(uname: uname, aname: aname, n_uname: uid)
-  end
+  main_loop = lambda do |*a|
+    client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+      raise attachment if StandardError === attachment
 
-  client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-    raise attachment if StandardError === attachment
-
-    dir_loop(attachment, paths, short_list: short_list) do
-      client.close
+      dir_loop(attachment, paths, short_list: short_list) do
+        client.close
+      end
     end
+  end
+  
+  if uid && auth_creds
+    NineP.vputs("Authenticating #{uid} with #{auth_creds.inspect}")
+    client.auth(uname: uname,
+                aname: aname,
+                n_uname: uid,
+                credentials: auth_creds,
+                &main_loop)
+  else
+    main_loop.call
   end
 end
 

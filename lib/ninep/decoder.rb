@@ -3,6 +3,8 @@ using SG::Ext
 
 require 'sg/attr_struct'
 
+require_relative 'util'
+
 require_relative 'packet'
 require_relative 'messages/error'
 require_relative 'messages/version'
@@ -95,6 +97,7 @@ module NineP
     def send_one pkt, io
       pkt.type = @packet_types_inv[pkt.coder]
       data = pkt.pack
+      NineP.vputs { "<< %s %i %s" % [ pkt.coder, data.size, data.inspect ] }
       io.write(data)
     end
     
@@ -103,6 +106,7 @@ module NineP
       pkt, more = Packet.read(io)
       raise DecodeError.new(-1, pkt, more) unless more.blank?
       pkt.coder = packet_types[pkt.type]
+      NineP.vputs { ">> %s %s" % [ pkt.coder, pkt.data.inspect ] }
       pkt
 
       # pktsize = io.read(4)
@@ -143,7 +147,7 @@ module NineP
   module L2000
     class Decoder < NineP::Decoder
       RequestReplies = {
-        7 => Rerror,
+        7 => L2000::Rerror,
         8 => Tstatfs, 9 => Rstatfs,
         12 => Topen, 13 => Ropen,
         14 => Tcreate, 15 => Rcreate,
@@ -154,7 +158,7 @@ module NineP
         24 => Tgetattr, 25 => Rgetattr,
         26 => Tsetattr, 27 => Rsetattr,
         40 => Treaddir, 41 => Rreaddir,
-        102 => Tauth, 103 => Rauth,
+        102 => L2000::Tauth, 103 => L2000::Rauth,
         104 => Tattach, 105 => Rattach,
       }
 

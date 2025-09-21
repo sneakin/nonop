@@ -13,5 +13,8 @@ module NineP
                      [:aname, NString],
                      [:n_uname, :uint32l]) # 9p2000.L only
     end
+
+    class Rauth < NineP::Rauth
+    end
   end
 end

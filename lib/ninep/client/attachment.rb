@@ -11,7 +11,7 @@ module NineP
 
     def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, &blk
       @client = client
-      @fid = fid || 0
+      @fid = fid || client.next_fid
       @afid = afid || -1
       @uname = uname || ''
       @n_uname = n_uname || -1
@@ -35,6 +35,12 @@ module NineP
 
     def ready?
       @ready
+    end
+
+    def close &blk
+      @ready = false
+      client.clunk(@fid, &blk)
+      self
     end
 
     def open *a, **o, &blk

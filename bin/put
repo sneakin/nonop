@@ -13,13 +13,15 @@ if $0 == __FILE__
   $verbose = false
   host = 'localhost'
   port = 564
-  uid = 0
-  uname = ''
+  uid = Process.uid
+  uname = ENV['USER']
+  auth_creds = nil
   aname = '/'
   max_packet_size = nil
   block_size = 4096
   write_offset = 0
   write_limit = nil
+  gid = Process.gid
   
   opts = OptionParser.new do |o|
     desc = 'Write a file to a file server.'
@@ -31,12 +33,19 @@ if $0 == __FILE__
     o.on('-v', '--verbose') do
       $verbose = true
     end
+    o.on('--gid INTEGER', Integer) do |v|
+      gid = v.to_i
+      raise ArgumentError.new("GID must be positive") if gid < 0
+    end
     o.on('-u', '--uname NAME') do |v|
       uname = v
     end
     o.on('--uid INTEGER', Integer) do |v|
       uid = v.to_i
       uid = nil if uid < 0
+    end
+    o.on('--auth-creds CREDS') do |v|
+      auth_creds = v
     end
     o.on('-e', '--aname NAME') do |v|
       aname = v
@@ -74,43 +83,47 @@ if $0 == __FILE__
       block_size = pkt.msize - NineP::Decoder::MIN_MSGLEN
     end
     
-    if uid
-      client.auth(uname: uname, aname: aname, n_uname: uid)
-    end
-
-   client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-      raise attachment if StandardError === attachment
-      reader = Enumerator.new do |y|
-        while data = $stdin.read(block_size)
-          y << data
-        end
-        raise StopIteration
-      rescue IOError
-        raise StopIteration
-      end
-
-      attachment.open(paths[0], flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
-        raise file if StandardError === file
-        
-        doner = lambda do |*state|
-          NineP.vputs("ALL DONE")
-          file.close
-          client.close
+    main_loop = lambda do |*a|
+      client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+        raise attachment if StandardError === attachment
+        reader = Enumerator.new do |y|
+          while data = $stdin.read(block_size)
+            y << data
+          end
+          raise StopIteration
+        rescue IOError
+          raise StopIteration
         end
 
-        NineP::Async.reduce(reader, 0, write_offset) do |data_block, count, offset, &cc|
-          NineP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
-          file.write(data_block, offset: offset) do |reply|
-            if StandardError === reply
-              cc.call(reply, count, offset, &doner)
-            else
-              cc.call(data_block.bytesize < block_size,
-                      count + reply,
-                      offset + reply, &doner)
+        attachment.open(paths[0], gid: gid, flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
+          raise file if StandardError === file
+          
+          doner = lambda do |*state|
+            NineP.vputs("ALL DONE")
+            file.close
+            client.close
+          end
+
+          NineP::Async.reduce(reader, 0, write_offset) do |data_block, count, offset, &cc|
+            NineP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
+            file.write(data_block, offset: offset) do |reply|
+              if StandardError === reply
+                cc.call(reply, count, offset, &doner)
+              else
+                cc.call(data_block.bytesize < block_size,
+                        count + reply,
+                        offset + reply, &doner)
+              end
             end
           end
         end
       end
+    end
+
+    if uid && auth_creds
+      client.auth(uname: uname, aname: aname, n_uname: uid, credentials: auth_creds, &main_loop)
+    else
+      main_loop.call
     end
   end
 

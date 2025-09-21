@@ -15,7 +15,7 @@ module NineP
       @next_tag = 0
       @next_fid = 0
       @afid = -1
-      @open_fids = {}
+      @open_fids = []
       @free_fids = []
     end
     
@@ -72,11 +72,12 @@ module NineP
     end
 
     def track_fid fid, &blk
-      @open_fids[fid] = blk || lambda { self.clunk(fid) }
+      @open_fids.delete_if { _1[0] == fid }
+      @open_fids << [ fid, blk || lambda { self.clunk(fid) } ]
     end
 
     def free_fid fid
-      @open_fids.delete(fid)
+      @open_fids.delete_if { _1[0] == fid }
       @free_fids.push(fid)
       self
     end
@@ -107,7 +108,7 @@ module NineP
     end
 
     def close_fids
-      @open_fids.each { _2.call }
+      @open_fids.reverse.each { _2.call }
       @open_fids.clear
       self
     end
@@ -130,29 +131,68 @@ module NineP
             version: pkt.version,
             msize: pkt.msize
           }
-          track_fid(0)
         end
         blk&.call(pkt)
       end
       self
     end
 
-    def auth uname:, n_uname:, aname:, &blk
-      request(L2000::Tauth.new(afid: 0, # todo attach first?
+    def auth uname:, n_uname:, aname:, credentials:, &blk
+      # Authenticating with Diode requires sending an Auth packet
+      # followed by attaching to the live afid. This is followed by
+      # clunking the two fids and attaching again with afid = -1.
+      # The supplied block should make the second attachment.
+      send_auth(uname:, aname:, n_uname:) do |io, &cc|
+        raise io if StandardError === io
+        
+        auth_cc = lambda do |reply = nil, &cc|
+          auth_attach(uname: '', aname:, n_uname:) do |attachment|
+            raise attachment if StandardError === attachment
+            cc.call do |*a|
+              attachment.close(&blk)
+            end
+          end
+        end
+
+        if credentials
+          io.write(credentials) { auth_cc.call(&cc) }
+        else
+          auth_cc.call(&cc)
+        end
+      end
+    end
+    
+    def send_auth uname:, n_uname:, aname:, &blk
+      NineP.vputs { "Authenticating #{n_uname}" }
+      auth_fid = 0
+      request(L2000::Tauth.new(afid: auth_fid,
                                uname: NString.new(uname),
                                aname: NString.new(aname),
                                n_uname: n_uname),
               wait_for: blk == nil) do |pkt|
         case pkt
-        when ErrorPayload then raise AuthError.new(pkt) if pkt.code != 2 && !blk
-        when Rauth then @afid = pkt.afid
+        when ErrorPayload then
+          if pkt.code != 2 && !blk
+            raise AuthError.new(pkt)
+          else
+            blk.call(NineP.maybe_wrap_error(pkt, AuthError))
+          end
+        when Rauth then
+          @afid = auth_fid
+          @aqid = pkt.aqid
+          # write credentials to afid
+          io = RemoteIO.new(self, auth_fid)
+          blk&.call(io) do |&cc|
+            io.close(&cc)
+          end
+        else blk&.call(pkt)
         end
-        blk&.call(pkt)
       end
       self
     end
 
     def clunk fid, async: nil, &blk
+      NineP.vputs { "Clunking #{fid}" }
       free_fid(fid) # todo call this? default calls back.
       result = request(NineP::Tclunk.new(fid: fid),
               wait_for: async != true && blk == nil) do |reply|
@@ -172,6 +212,10 @@ module NineP
 
     def attach(**opts, &blk)
       Attachment.new(**opts.merge(client: self), &blk)
+    end
+
+    def auth_attach(**opts, &blk)
+      Attachment.new(**opts.merge(client: self, afid: @afid), &blk)
     end
 
     def flush_tag oldtag, &blk

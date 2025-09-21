@@ -4,16 +4,18 @@ using SG::Ext
 require_relative '../async'
 require_relative '../util'
 require_relative '../remote-path'
+require_relative 'remote-io'
 
 module NineP
   class RemoteFile
-    attr_reader :attachment, :path, :flags, :fid
+    attr_reader :attachment, :path, :flags, :io
     
     def initialize path, attachment:, flags: nil, fid: nil, mode: nil, gid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
       @flags = L2000::Topen.flag_mask(flags || [:RDONLY])
       @fid = fid || client.next_fid
+      @io = RemoteIO.new(client, @fid)
 
       open(mode: mode, gid: gid, &blk)
     end
@@ -34,7 +36,6 @@ module NineP
             blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
           else
             client.track_fid(@fid) do
-              @ready = false
               close
             end
             client.request(NineP::L2000::Topen.new(fid: @fid,
@@ -82,84 +83,27 @@ module NineP
       end
     end
     
-    def close
-      client.clunk(fid)
+    def close &blk
+      @io.close(&blk)
+      @ready = false
       self
     end
 
     # todo length limited to msglen
     # todo handling multiple replies for big reads
     def read length, offset: 0, &blk
-      raise ArgumentError.new("Length %i must be 1...%i" % [ length, client.max_datalen ]) unless (1..client.max_datalen) === length
-      raise ArgumentError.new("Offset must be positive") if offset < 0
-      
-      req = client.request(NineP::Tread.new(fid: fid,
-                                            offset: offset,
-                                            count: length),
-                           wait_for: blk == nil) do |result|
-        blk&.call(wrap_error_or_data(result, ReadError))
-      end
-
-      if blk
-        self
-      else
-        case req.data
-        when Rread then return req.data.data
-        when ErrorPayload then raise ReadError.new(req.data, path)
-        else raise TypeError.new(req)
-        end
-      end
+      r = @io.read(length, offset:, &blk)
+      @io == r ? self : r
     end
 
     def write data, offset: 0, length: nil, &blk
-      raise ArgumentError.new("Offset must be positive") if offset < 0
-
-      length ||= data.size
-      block_size = client.max_datalen
-      slices = NineP.block_string(data, block_size, length: length)
-      results = Async.reduce(slices, 0, offset) do |to_send, counter, offset, &cc|
-        if to_send.blank?
-          cc.call(true, counter, offset, &blk)
-          next
-        end
-
-        write_one(to_send, offset: offset) do |result|
-          if ErrorPayload === result
-            cc.call(result, counter, offset, &blk)
-          elsif result.count == to_send.bytesize
-            cc.call(false, counter + result.count, offset + result.count, &blk)
-          else
-            cc.call(true, counter + result.count, offset + result.count, &blk)
-          end
-        end
-      end
-      
-      if blk
-        self
-      else
-        raise WriteError.new(err, path) if ErrorPayload === results
-        return results[0]
-      end
+      r = @io.write(data, offset:, length:, &blk)
+      @io == r ? self : r
     end
     
     def write_one data, offset: 0, &blk
-      raise ArgumentError.new("Length %i must be 1...%i" % [ data.bytesize, client.max_datalen ]) unless (1..client.max_datalen) === data.bytesize
-      raise ArgumentError.new("Offset must be positive") if offset < 0
-
-      req = client.request(Twrite.new(fid: fid, offset: offset, data: data),
-                     wait_for: blk == nil) do |result|
-        blk&.call(NineP.maybe_wrap_error(result, WriteError))
-      end
-      
-      if blk
-        self
-      else
-        case req.data
-        when Rwrite then return req.data.data
-        when ErrorPayload then raise WriteError.new(req.data, path)
-        else raise TypeError.new(req)
-        end
-      end
+      r = @io.write_one(data, offset:, &blk)
+      @io == r ? self : r
     end
     
     def wrap_error_or_data pkt, error = Error
@@ -168,6 +112,5 @@ module NineP
       else pkt.data
       end
     end
-    
   end
 end
