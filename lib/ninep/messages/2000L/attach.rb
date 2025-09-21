@@ -14,5 +14,8 @@ module NineP
                      [:aname, NString],
                      [:n_uname, :uint32l])
     end
+
+    class Rattach < NineP::Rattach
+    end
   end
 end

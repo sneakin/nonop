@@ -14,6 +14,8 @@ require_relative 'messages/walk'
 require_relative 'messages/clunk'
 require_relative 'messages/remove'
 require_relative 'messages/stat'
+require_relative 'messages/create'
+require_relative 'messages/open'
 require_relative 'messages/read'
 require_relative 'messages/write'
 require_relative 'messages/flush'
@@ -36,7 +38,7 @@ require_relative 'messages/2000L/rename'
 
 module NineP
   class Decoder
-    VERSION = '9P2000.U'
+    VERSION = '9P2000'
     
     MIN_MSGLEN = 128
     MAX_MSGLEN = 65535
@@ -48,6 +50,8 @@ module NineP
       107 => Rerror,
       108 => Tflush, 109 => Rflush,
       110 => Twalk, 111 => Rwalk,
+      112 => Topen, 113 => Ropen,
+      114 => Tcreate, 115 => Rcreate,
       116 => Tread, 117 => Rread,
       118 => Twrite, 119 => Rwrite,
       120 => Tclunk, 121 => Rclunk,
@@ -152,8 +156,8 @@ module NineP
       RequestReplies = {
         7 => L2000::Rerror,
         8 => Tstatfs, 9 => Rstatfs,
-        12 => Topen, 13 => Ropen,
-        14 => Tcreate, 15 => Rcreate,
+        12 => L2000::Topen, 13 => L2000::Ropen,
+        14 => L2000::Tcreate, 15 => L2000::Rcreate,
         16 => Tsymlink, 17 => Rsymlink,
         18 => Tmknod, 19 => Rmknod,
         20 => Trename, 21 => Rrename,
@@ -164,7 +168,7 @@ module NineP
         70 => Tlink, 71 => Rlink,
         72 => Tmkdir, 73 => Rmkdir,
         102 => L2000::Tauth, 103 => L2000::Rauth,
-        104 => Tattach, 105 => Rattach,
+        104 => L2000::Tattach, 105 => L2000::Rattach,
       }
 
       def initialize **opts

@@ -47,11 +47,7 @@ module NineP
       end
     end
 
-    class Ropen
-      # size[4] Rlopen tag[2] qid[13] iounit[4]
-      include Packet::Data
-      define_packing([:qid, Qid],
-                     [:iounit, :uint32l])
+    class Ropen < NineP::Ropen
     end
   end
 end

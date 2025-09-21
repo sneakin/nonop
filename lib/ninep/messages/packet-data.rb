@@ -2,6 +2,7 @@ require 'sg/ext'
 using SG::Ext
 
 require 'sg/packed_struct'
+require_relative '../nstring'
 
 module NineP
   class Packet

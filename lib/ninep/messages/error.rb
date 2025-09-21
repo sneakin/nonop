@@ -17,6 +17,7 @@ module NineP
   
   class Rerror < ErrorPayload
     include Packet::Data
-    define_packing([:code, :uint32l])
+    define_packing([:msg, NString],
+                   [:code, :uint32l])
   end
 end
