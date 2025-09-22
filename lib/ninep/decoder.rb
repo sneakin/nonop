@@ -155,6 +155,10 @@ module NineP
       end
       self
     end
+
+    def type_id_for klass
+      @packet_types_inv[klass]
+    end
   end
 
   module L2000

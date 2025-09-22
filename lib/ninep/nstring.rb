@@ -9,8 +9,10 @@ module NineP
     include SG::PackedStruct
     define_packing([:size, :uint16l],
                    [:value, :string, :size])
+    calc_attr :size, lambda { value.bytesize }
 
     def initialize *opts
+      super()
       case opts
         in [] then @size = 0
         in [ Integer, String ] then @size, @value = opts
@@ -21,16 +23,12 @@ module NineP
       @value ||= "\x00" * @size
     end
         
-    def size
-      @size || value.size
-    end
-    
     def to_s
       value
     end
 
     def == other
-      0 == (self <=> other)
+      self.class === other && value == other.value
     end
 
     def <=> other

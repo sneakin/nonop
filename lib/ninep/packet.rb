@@ -11,19 +11,18 @@ module NineP
                    [:type, :uint8],
                    [:tag, :uint16l],
                    [:raw_data, :string, :data_size])
-    
+    calc_attr :size, lambda { attribute_offset(:raw_data) + data.bytesize }
     attributes :coder, :data, :extra_data
     
-    def size
-      @size || (attribute_offset(:raw_data) + data.bytesize)
-    end
-
     def coder
       @coder || data&.class
     end
     
     def pack
-      @raw_data = @data.pack if @data
+      if @data
+        @raw_data = @data.pack
+        @type ||= coder.type_id_for(@data.class)
+      end
       super
     end
     
