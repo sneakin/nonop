@@ -6,7 +6,8 @@ require_relative '../error'
 
 module NineP
   module L2000
-    class Rerror < ErrorPayload
+    class Rerror
+      include ErrorPayload
       include Packet::Data
       define_packing([:code, :uint32l])
     end

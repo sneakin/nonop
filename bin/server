@@ -1,0 +1,94 @@
+#!/usr/bin/env -S bundle exec ruby
+# -*-ruby-*-
+
+require 'sg/ext'
+using SG::Ext
+
+require 'ninep'
+require 'optparse'
+
+require 'sg/io/reactor'
+
+$verbose = false
+listen_on = nil
+port = 562
+
+opts = OptionParser.new do |o|
+  desc = 'Run a file server.'
+  o.banner += "\n\n" + desc + "\n\n"
+  o.on('--help-banner') do
+    puts(desc)
+    exit(0)
+  end
+  o.banner = "9p Server"
+  o.on('-v', '--verbose') do
+    $verbose = true
+  end
+  o.on('-p', '--port INT') do |v|
+    port = v.to_i
+  end
+  o.on('-l', '--listen HOST') do |v|
+    listen_on = v
+  end
+end
+args = opts.parse(ARGV)
+
+puts "Hello"
+puts "Verbose: #{$verbose}"
+puts "Port: #{port}"
+puts "Listen: #{listen_on}"
+puts "Args: #{args.join(', ')}"
+
+listen_sock = TCPServer.new(listen_on, port)
+reactor = SG::IO::Reactor.new
+reactor << SG::IO::Reactor::Listener.new(listen_sock, reactor) do |client|
+  puts("Accepted client #{client}")
+  qid = NineP::Qid.new(type: NineP::Qid::Types[:DIR], version: 0, path: '/')
+  coder = NineP::L2000::Decoder.new
+  output = SG::IO::Reactor::QueuedOutput.new(client)
+  input = SG::IO::Reactor::BasicInput.new(client) do
+    NineP.vputs { ">> #{client}" }
+    pkt = coder.read_one(client)
+    case pkt.data
+    when NineP::Tversion then
+      coder.send_one(NineP::Packet.
+                     new(tag: pkt.tag,
+                         data: NineP::Rversion.new(msize: coder.max_msglen,
+                                                   version: NineP::NString.new(coder.version))),
+                     output)
+    when NineP::L2000::Tauth then
+      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::L2000::Rauth.new(aqid: qid)),
+                     output)
+    when NineP::Twrite then
+      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::Rwrite.new(count: pkt.data.count)),
+                     output)
+    when NineP::Tclunk then
+      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::Rclunk.new),
+                     output)
+    when NineP::L2000::Tattach then
+      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::L2000::Rattach.new(aqid: qid)),
+                     output)
+    else
+      coder.send_one(NineP::Packet.new(tag: pkt.tag,
+                                       data: NineP::L2000::Rerror.new(Errno::ENOTSUP)),
+                     output)
+    end
+  rescue SG::PackedStruct::NoDataError
+    if client.eof?
+      puts("Closed #{client}")
+    else
+      $stderr.puts("Error on #{client}: #{$!.message}")
+    end
+    output.close
+    client.close
+  rescue NineP::Error
+    $stderr.puts("Error on #{client}: #{$!.message}")
+    coder.send_one(NineP::Packet.new(tag: pkt.tag,
+                                     data: NineP::L2000::Rerror.new($!)),
+                   output)
+    output.close
+    client.close
+  end
+  [ input, output ]
+end
+reactor.serve!
