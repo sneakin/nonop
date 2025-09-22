@@ -56,7 +56,7 @@ module NineP
         end
 
         write_one(to_send, offset: offset) do |result|
-          if ErrorPayload === result
+          if StandardError === result
             cc.call(result, counter, offset, &blk)
           elsif result.count == to_send.bytesize
             cc.call(false, counter + result.count, offset + result.count, &blk)

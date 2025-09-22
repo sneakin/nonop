@@ -4,6 +4,7 @@ using SG::Ext
 require 'sg/attr_struct'
 
 require_relative 'util'
+require_relative 'errors'
 
 require_relative 'packet'
 require_relative 'messages/error'
@@ -62,7 +63,7 @@ module NineP
       126 => Twstat, 127 => Rwstat,
     }
 
-    class DecodeError < RuntimeError
+    class DecodeError < NineP::Error
       include SG::AttrStruct
       attributes :size, :packet, :extra
       
@@ -111,7 +112,11 @@ module NineP
     
     def read_one io
       # todo any real need for Packet? Which of these is faster?
-      pkt, more = Packet.read(io)
+      pkt, more = begin
+        Packet.read(io)
+      rescue ArgumentError
+        raise DecodeError.new(-1, nil, nil)
+      end
       raise DecodeError.new(-1, pkt, more) unless more.blank?
       pkt.coder = packet_types[pkt.type]
       NineP.vputs { ">> %s %s" % [ pkt.coder, pkt.data.inspect ] }

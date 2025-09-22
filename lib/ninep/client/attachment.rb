@@ -101,9 +101,9 @@ module NineP
           client.track_fid(nfid)
           NineP.maybe_call(blk, pkt)
         when ErrorPayload then
-          return NineP.maybe_call(blk, WalkError.new(pkt, path))
+          next NineP.maybe_call(blk, WalkError.new(pkt, path))
         else
-          return NineP.maybe_call(blk, TypeError.new(pkt.class))
+          next NineP.maybe_call(blk, TypeError.new(pkt.class))
         end
       end
 
