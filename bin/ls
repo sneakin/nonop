@@ -31,7 +31,13 @@ opts = OptionParser.new do |o|
   o.on('-v', '--verbose') do
     $verbose = true
   end
-  o.on('-p', '--protocol NAWE') do |v|
+  o.on('--host HOST') do |v|
+    host = v
+  end
+  o.on('--port INTEGER', Integer) do |v|
+    port = v
+  end
+  o.on('-P', '--protocol NAWE') do |v|
     coder = v
   end
   o.on('-u', '--uname NAME') do |v|
