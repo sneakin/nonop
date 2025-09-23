@@ -205,7 +205,7 @@ module NineP
       result = request(NineP::Tclunk.new(fid: fid),
               wait_for: async != true && blk == nil) do |reply|
         case reply
-        when ErrorPayload then blk&.call(maybe_wrap_error(reply, ClunkError))
+        when ErrorPayload then blk&.call(NineP.maybe_wrap_error(reply, ClunkError))
         when Rclunk then blk&.call(reply)
         else raise TypeError.new(reply.class)
         end

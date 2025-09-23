@@ -5,6 +5,7 @@ require 'sg/ext'
 using SG::Ext
 
 require 'ninep'
+require 'munge'
 require 'optparse'
 
 require 'sg/io/reactor'
@@ -12,6 +13,7 @@ require 'sg/io/reactor'
 $verbose = false
 listen_on = nil
 port = 562
+auth_db_path = nil
 
 opts = OptionParser.new do |o|
   desc = 'Run a file server.'
@@ -30,65 +32,405 @@ opts = OptionParser.new do |o|
   o.on('-l', '--listen HOST') do |v|
     listen_on = v
   end
+  o.on('--auth-db PATH') do |v|
+    auth_db_path = v
+  end
 end
 args = opts.parse(ARGV)
 
-puts "Hello"
-puts "Verbose: #{$verbose}"
-puts "Port: #{port}"
-puts "Listen: #{listen_on}"
-puts "Args: #{args.join(', ')}"
+if $verbose
+  puts "Listening on #{listen_on}:#{port}"
+  puts "Args: #{args.join(', ')}"
+end
+
+module NineP
+  module Server
+    class FileSystem
+      def initialize
+        @fids = {}
+      end
+      
+      def qid
+        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:DIR], version: 0, path: '/')
+      end
+
+      def close fid
+        f = @fids.delete(fid)
+        f&.call
+        self
+      end
+      
+      def walk path
+        NineP.vputs { "Walking to #{path}" }
+        if path.size == 0
+          [ qid, 0 ]
+        else
+          false
+        end
+      end
+    end
+
+    class HashFileSystem
+      class Entry
+        def initialize name, data
+          @name = name
+          @data = data
+        end
+        
+        def qid
+          @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:FILE], version: 0, path: @name[0, 8])
+        end
+      end
+      
+      def initialize entries = nil
+        @entries = Hash[(entries || {}).collect { |name, data| [ name,  Entry.new(name, data) ] }]
+        @next_id = 0
+        @fsids = {}
+      end
+      
+      def qid
+        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:DIR], version: 0, path: '')
+      end
+
+      def qid_for path
+        @entries.fetch(path).qid
+      end
+
+      def open fsid, flags
+        NineP.vputs { "Opening #{fsid} #{@fsids[fsid]}" }
+        raise Errno::EINVAL unless fsid == 0 || @entries.has_key?(@fsids.fetch(fsid))
+        true
+      rescue KeyError
+        raise Errno::EINVAL
+      end
+      
+      def close fsid
+        @fsids.delete(fsid)
+      end
+
+      def next_id
+        @next_id += 1
+      end
+      
+      def walk path
+        NineP.vputs { "Walking to #{path}" }
+        if path.size == 0
+          [ [ qid ], 0 ]
+        elsif path.size == 1
+          i = next_id
+          @fsids[i] = path
+          [ [ qid_for(path[0].to_s) ], i ]
+        else
+          false
+        end
+      rescue KeyError
+        false
+      end
+
+      def readdir count, offset = 0
+      end
+
+      def read count, offset = 0
+      end
+
+      def write data, offset = 0
+      end
+    end
+
+    class AuthService
+      def auth user, creds
+        false
+      end
+      def find_user user
+        nil
+      end
+      def has_user? user
+        false
+      end
+    end
+
+    class AuthHash < AuthService
+      def initialize db
+        @db = db
+      end
+      def auth user, creds
+        u = find_user(user)
+        u && u[1] == creds.strip
+      end
+      def find_user user
+        case user
+        when String then @db[user]
+        when Integer then @db.find { _2[0] == user }&.then { _2 }
+        else raise TypeError.new('User not a string or ID.')
+        end
+      end
+      def has_user? user
+        find_user(user) != nil
+      end
+    end
+
+    class MungeAuth < AuthHash
+      def auth user, creds
+        return false unless has_user?(user)
+        status, meta, payload = Munge.verify do |io|
+          io.puts(creds)
+        end
+        status == 0 && meta.fetch('STATUS', '') =~ /^Success/ &&
+          (Integer === user && meta.fetch('UID', '') =~ /\(#{user}\)/ ||
+           String === user && meta.fetch('UID', '') =~ /#{user}/)
+      end
+    end
+
+    class Stream
+      def close
+        @closed = true
+      end
+      def closed?
+        @closed
+      end
+      def open flags
+        raise Errno::EINVAL
+      end
+      def write data, offset = 0
+        raise Errno::EINVAL
+      end
+      def walk path, nfid
+        raise Errno::EINVAL
+      end
+    end
+    
+    class ErrantStream < Stream
+      include Singleton
+    end
+
+    class AuthStream < Stream
+      def initialize environment, user
+        @environment = environment
+        @user = user
+        @data = ''
+      end
+
+      def write data, offset = 0
+        raise EOFError.new if closed?
+        @data[offset, data.size] = data
+        data.size
+      end
+
+      def authentic?
+        NineP.vputs { [ "Authenticating #{@user}", @data.inspect, @environment.find_user(@user).inspect ] }
+        @environment.auth(@user, @data)
+      end
+    end
+
+    class FileStream < Stream
+      def initialize fs, fid, qids, fsid
+        @fs = fs
+        @fid = fid
+        @qids = qids
+        @fsid = fsid
+      end
+
+      def qid
+        @qids[-1]
+      end
+
+      def close
+        @fs.close(@fsid)
+      end
+
+      def open flags
+        @fs.open(@fsid, flags)
+      end
+      
+      def readdir count, offset = 0
+        @fs.readdir(@fsid, count, offset)
+      end
+
+      def read count, offset = 0
+        @fs.read(@fsid, count, offset)
+      end
+
+      def write data, offset = 0
+        @fs.write(data, offset)
+      end
+    end
+      
+    class AttachStream < Stream
+      attr_reader :fs
+      
+      def initialize fs, fid
+        @fs = fs
+        @fid = fid
+      end
+
+      def close
+        @fs.close(@fid)
+      end
+
+      def walk path
+        @fs.walk(path)
+      end
+    end
+      
+    class Environment
+      attr_reader :authsrv, :auth_qid
+      
+      def initialize authsrv: nil
+        @authsrv = authsrv
+        @exports = {}
+        @auth_qid = NineP::Qid.new(type: NineP::Qid::Types[:AUTH], version: 0, path: '')
+      end
+
+      def export name, fs
+        @exports[name] = fs
+        self
+      end
+
+      def get_export name
+        @exports.fetch(name)
+      end
+
+      delegate :auth, :find_user, :has_user?, to: :authsrv
+    end
+    
+    class Connection
+      attr_reader :io, :coder, :input, :output, :environment
+      
+      def initialize io, env
+        @io = io
+        @environment = env
+        @coder = NineP::L2000::Decoder.new
+        @output = SG::IO::Reactor::QueuedOutput.new(@io)
+        @input = SG::IO::Reactor::BasicInput.new(@io) { handle }
+        @open_fids = Hash.new(ErrantStream.instance)
+      end
+
+      def close
+        @output.close
+        @io.close
+      end
+
+      def reply_to pkt, msg
+        coder.send_one(NineP::Packet.new(tag: pkt.tag, data: msg),
+                       output)
+      end
+      
+      def handle
+        pkt = coder.read_one(@io)
+        case pkt.data
+        when NineP::Tversion then
+          reply_to(pkt, NineP::Rversion.new(msize: coder.max_msglen,
+                                            version: NineP::NString.new(coder.version)))
+        when NineP::L2000::Tauth then
+          if environment.has_user?(pkt.data.n_uname)
+            @open_fids[0] = @auth_stream = AuthStream.new(environment, pkt.data.n_uname)
+            reply_to(pkt, NineP::L2000::Rauth.new(aqid: environment.auth_qid))
+          else
+            reply_to(pkt, NineP::L2000::Rerror.new(Errno::EACCES))
+          end            
+        when NineP::L2000::Tattach then
+          # todo creates a fid
+          if pkt.data.afid == 0
+            if @auth_stream.authentic?
+              @open_fids[pkt.data.fid] = ErrantStream.instance
+              reply_to(pkt, NineP::L2000::Rattach.new(aqid: environment.auth_qid))
+            else
+              reply_to(pkt, NineP::L2000::Rerror.new(Errno::EACCES))
+            end
+          elsif pkt.data.afid == 0xFFFFFFFF
+            begin
+              fs = environment.get_export(pkt.data.aname.to_s)
+              @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
+              reply_to(pkt, NineP::L2000::Rattach.new(aqid: fs.qid))
+            rescue KeyError
+              reply_to(pkt, NineP::L2000::Rerror.new(Errno::EINVAL))
+            end
+          else
+            reply_to(pkt, NineP::L2000::Rerror.new(Errno::EINVAL))
+          end
+        when NineP::Twrite then
+          stream = @open_fids[pkt.data.fid]
+          begin
+            reply_to(pkt, NineP::Rwrite.new(count: stream.write(pkt.data.data, pkt.data.offset)))
+          rescue SystemCallError
+            reply_to(pkt, NineP::L2000::Rerror.new($!))
+          end
+        when NineP::Tclunk then
+          if stream = @open_fids.delete(pkt.data.fid)
+            stream.close
+            reply_to(pkt, NineP::Rclunk.new)
+          else
+            reply_to(pkt, NineP::L2000::Rerror.new(Errno::EINVAL))
+          end
+        when NineP::Twalk then
+          stream = @open_fids[pkt.data.fid]
+          qids, fsid = stream.walk(pkt.data.wnames)
+          NineP.vputs { "Walked #{pkt.data.wnames} #{qids.inspect}" }
+          if qids && fsid
+            new_stream = FileStream.new(stream.fs, pkt.data.fid, qids, fsid)
+            @open_fids[pkt.data.newfid] = new_stream
+            reply_to(pkt, NineP::Rwalk.new(wqid: qids))
+          else
+            reply_to(pkt, NineP::L2000::Rerror.new(Errno::EINVAL))
+          end
+        when NineP::L2000::Topen then # todo
+          stream = @open_fids[pkt.data.fid]
+          NineP.vputs { "Opening #{pkt.data.fid} #{stream.inspect}" }
+          begin
+            stream.open(pkt.data.flags)
+            reply_to(pkt, NineP::Ropen.new(qid: stream.qid, iounit: 0))
+          rescue SystemCallError
+            reply_to(pkt, NineP::L2000::Rerror.new($!))
+          end
+        else
+          reply_to(pkt, NineP::L2000::Rerror.new(Errno::ENOTSUP))
+        end
+      rescue SG::PackedStruct::NoDataError
+        if io.eof?
+          puts("Closed #{io}")
+        else
+          $stderr.puts("Error on #{io}: #{$!.message}")
+        end
+        close
+      rescue NineP::Error
+        $stderr.puts("Error on #{io}: #{$!.message}")
+        reply_to(pkt, NineP::L2000::Rerror.new($!))
+        close
+      end
+    end
+  end
+end
+
+users = {}
+if auth_db_path
+  File.open(auth_db_path, 'r') do |f|
+    f.each_line do |line|
+      name, uid, cred = line.split(':')
+      users[name] = [ uid.to_i, cred ]
+    end
+  end
+else
+  users[ENV['USER']] = [ Process.uid, ENV['USER'] ]
+end
+
+auth = NineP::Server::MungeAuth.new(users)
+fs = NineP::Server::HashFileSystem.new('a' => '1234')
+ctlfs = NineP::Server::HashFileSystem.new('stats' => 'hello')
+srvenv = NineP::Server::Environment.new(authsrv: auth).
+  export('/', fs).
+  export('ctl', ctlfs)
 
 listen_sock = TCPServer.new(listen_on, port)
+
 reactor = SG::IO::Reactor.new
 reactor << SG::IO::Reactor::Listener.new(listen_sock, reactor) do |client|
   puts("Accepted client #{client}")
-  qid = NineP::Qid.new(type: NineP::Qid::Types[:DIR], version: 0, path: '/')
-  coder = NineP::L2000::Decoder.new
-  output = SG::IO::Reactor::QueuedOutput.new(client)
-  input = SG::IO::Reactor::BasicInput.new(client) do
-    NineP.vputs { ">> #{client}" }
-    pkt = coder.read_one(client)
-    case pkt.data
-    when NineP::Tversion then
-      coder.send_one(NineP::Packet.
-                     new(tag: pkt.tag,
-                         data: NineP::Rversion.new(msize: coder.max_msglen,
-                                                   version: NineP::NString.new(coder.version))),
-                     output)
-    when NineP::L2000::Tauth then
-      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::L2000::Rauth.new(aqid: qid)),
-                     output)
-    when NineP::Twrite then
-      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::Rwrite.new(count: pkt.data.count)),
-                     output)
-    when NineP::Tclunk then
-      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::Rclunk.new),
-                     output)
-    when NineP::L2000::Tattach then
-      coder.send_one(NineP::Packet.new(tag: pkt.tag, data: NineP::L2000::Rattach.new(aqid: qid)),
-                     output)
-    else
-      coder.send_one(NineP::Packet.new(tag: pkt.tag,
-                                       data: NineP::L2000::Rerror.new(Errno::ENOTSUP)),
-                     output)
-    end
-  rescue SG::PackedStruct::NoDataError
-    if client.eof?
-      puts("Closed #{client}")
-    else
-      $stderr.puts("Error on #{client}: #{$!.message}")
-    end
-    output.close
-    client.close
-  rescue NineP::Error
-    $stderr.puts("Error on #{client}: #{$!.message}")
-    coder.send_one(NineP::Packet.new(tag: pkt.tag,
-                                     data: NineP::L2000::Rerror.new($!)),
-                   output)
-    output.close
-    client.close
-  end
-  [ input, output ]
+  conn = NineP::Server::Connection.new(client, srvenv)
+  [ conn.input, conn.output ]
 end
-reactor.serve!
+
+%w{INT QUIT}.each do |sig|
+  Signal.trap(sig) { reactor.done! }
+end
+
+reactor.serve! timeout: 15

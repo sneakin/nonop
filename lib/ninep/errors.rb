@@ -24,6 +24,8 @@ module NineP
   end
   class CreateError < ProtocolError
   end
+  class ClunkError < ProtocolError
+  end
   class ReadError < ProtocolError
   end
   class WriteError < ProtocolError

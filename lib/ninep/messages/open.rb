@@ -9,7 +9,7 @@ module NineP
     # size[4] Tlopen tag[2] fid[4] mode[1]
     include Packet::Data
     define_packing([:fid, :uint32l],
-                   [:mode, :uint8])
+                   [:flags, :uint8])
   end
 
   class Ropen
