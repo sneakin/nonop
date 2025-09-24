@@ -88,6 +88,42 @@ module NineP
         def type
           0
         end
+
+        def size
+          data.bytesize
+        end
+
+        def data
+          case @data
+          when Proc then @data.call.to_s
+          when Pathname then @data.read
+          else @data
+          end
+        end
+        
+        def getattr
+          { valid: 1,
+            qid: qid,
+            mode: 0100644,
+            uid: Process.uid,
+            gid: Process.gid,
+            nlink: 1,
+            rdev: 0,
+            size: size,
+            blksize: 4096,
+            blocks: size / 4096,
+            atime_sec: 0,
+            atime_nsec: 0,
+            mtime_sec: 0,
+            mtime_nsec: 0,
+            ctime_sec: 0,
+            ctime_nsec: 0,
+            btime_sec: 0,
+            btime_nsec: 0,
+            gen: 0,
+            data_version: 0
+          }
+        end
       end
       
       def initialize entries = nil
@@ -146,17 +182,41 @@ module NineP
       def read fsid, count, offset = 0
         entry = @entries.fetch(@fsids.fetch(fsid))
         data = entry.data
-        data = case data
-               when Proc then data.call.to_s
-               when Pathname then data.read
-               else data
-               end
         data[offset, count]
       rescue KeyError
         raise Errno::EINVAL
       end
 
       def write fsid, data, offset = 0
+      end
+
+      def getattr fsid, mask
+        if fsid == 0
+          { valid: 1,
+            qid: qid,
+            mode: 0040755,
+            uid: Process.uid,
+            gid: Process.gid,
+            nlink: 1,
+            rdev: 0,
+            size: @entries.size,
+            blksize: 4096,
+            blocks: @entries.size / 4096,
+            atime_sec: 0,
+            atime_nsec: 0,
+            mtime_sec: 0,
+            mtime_nsec: 0,
+            ctime_sec: 0,
+            ctime_nsec: 0,
+            btime_sec: 0,
+            btime_nsec: 0,
+            gen: 0,
+            data_version: 0
+          }
+        else
+          entry = @entries.fetch(@fsids.fetch(fsid))
+          entry.getattr
+        end
       end
     end
 
@@ -232,6 +292,9 @@ module NineP
       def walk path
         raise Errno::EINVAL
       end
+      def getattr mask
+        raise Errno::EINVAL
+      end
     end
     
     class ErrantStream < Stream
@@ -294,6 +357,10 @@ module NineP
       def walk path
         @fs.walk(path)
       end
+
+      def getattr mask
+        @fs.getattr(@fsid, mask)
+      end
     end
       
     class AttachStream < Stream
@@ -310,6 +377,10 @@ module NineP
 
       def walk path
         @fs.walk(path)
+      end
+
+      def getattr mask
+        @fs.getattr(0, mask)
       end
     end
       
@@ -461,9 +532,9 @@ module NineP
             reply_to(pkt, NineP::L2000::Rerror.new($!))
           end
         when NineP::L2000::Treaddir then
-          stream = @open_fids[pkt.data.fid]
-          NineP.vputs { "Reading dir #{pkt.data.fid} #{stream.inspect}" }
           begin
+            stream = @open_fids[pkt.data.fid]
+            NineP.vputs { "Reading dir #{pkt.data.fid} #{stream.inspect}" }
             ents = stream.readdir(pkt.data.count, pkt.data.offset).
               each.with_index.
               collect { NineP::L2000::Rreaddir::Dirent.new(qid: _1.qid,
@@ -474,10 +545,19 @@ module NineP
           rescue SystemCallError
             reply_to(pkt, NineP::L2000::Rerror.new($!))
           end
+        when NineP::L2000::Tgetattr then
+          begin
+            stream = @open_fids[pkt.data.fid]
+            NineP.vputs { "Getattr #{pkt.data.fid} #{stream.inspect}" }
+            stats = stream.getattr(pkt.data.request_mask)
+            reply_to(pkt, NineP::L2000::Rgetattr.new(**stats))
+          rescue SystemCallError
+            reply_to(pkt, NineP::L2000::Rerror.new($!))
+          end
         else
           reply_to(pkt, NineP::L2000::Rerror.new(Errno::ENOTSUP))
         end
-      rescue SG::PackedStruct::NoDataError
+      rescue SG::PackedStruct::NoDataError, Errno::ECONNRESET
         if io.eof?
           puts("Closed #{io}")
         else
@@ -503,6 +583,7 @@ if auth_db_path
   end
 else
   users[ENV['USER']] = [ Process.uid, ENV['USER'] ]
+  users['root'] = [ 0, 'root' ]
 end
 
 def format_server_stats stats

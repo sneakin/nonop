@@ -118,9 +118,9 @@ module NineP
       rescue ArgumentError
         raise DecodeError.new(-1, nil, nil)
       end
-      raise DecodeError.new(-1, pkt, more) unless more.blank?
       pkt.coder = packet_types[pkt.type]
-      NineP.vputs { ">> %s %s" % [ pkt.coder, pkt.data.inspect ] }
+      NineP.vputs { ">> %s %s %s" % [ pkt.tag, pkt.type, pkt.data.inspect ] }
+      raise DecodeError.new(-1, pkt, more) if NopDecoder === pkt.coder || !more.blank?
       pkt
 
       # pktsize = io.read(4)
