@@ -170,6 +170,9 @@ module NineP
       def has_user? user
         false
       end
+      def user_count
+        0
+      end
     end
 
     class AuthHash < AuthService
@@ -189,6 +192,9 @@ module NineP
       end
       def has_user? user
         find_user(user) != nil
+      end
+      def user_count
+        @db.size
       end
     end
 
@@ -309,11 +315,14 @@ module NineP
       
     class Environment
       attr_reader :authsrv, :auth_qid
+      attr_reader :exports, :connections
       
       def initialize authsrv: nil
         @authsrv = authsrv
         @exports = {}
         @auth_qid = NineP::Qid.new(type: NineP::Qid::Types[:AUTH], version: 0, path: '')
+        @started_at = Time.now
+        @connections = {}
       end
 
       def export name, fs
@@ -326,6 +335,26 @@ module NineP
       end
 
       delegate :auth, :find_user, :has_user?, to: :authsrv
+
+      def track_connection conn
+        @connections[conn] = conn
+        self
+      end
+
+      def untrack_connection conn
+        @connections.delete(conn)
+        self
+      end
+      
+      def stats
+        { exports: exports.size,
+          connections: connections.size,
+          users: authsrv.user_count,
+          now: Time.now,
+          uptime: Time.now - @started_at,
+          started_at: @started_at
+        }
+      end
     end
     
     class Connection
@@ -338,11 +367,14 @@ module NineP
         @output = SG::IO::Reactor::QueuedOutput.new(@io)
         @input = SG::IO::Reactor::BasicInput.new(@io) { handle }
         @open_fids = Hash.new(ErrantStream.instance)
+        env.track_connection(self)
       end
 
       def close
         @output.close
         @io.close
+        environment.untrack_connection(self)
+        self
       end
 
       def reply_to pkt, msg
@@ -473,17 +505,23 @@ else
   users[ENV['USER']] = [ Process.uid, ENV['USER'] ]
 end
 
+def format_server_stats stats
+  max_name = stats.keys.collect { _1.to_s.size }.max
+  stats.collect { "%-*s  %s" % [ max_name, _1, _2 ] }.join("\n") + "\n"
+end
+
 auth = NineP::Server::MungeAuth.new(users)
 fs = NineP::Server::HashFileSystem.
   new('abcd' => "1234\n",
       "utf8.txt" => "😻\n")
+srvenv = NineP::Server::Environment.new(authsrv: auth).
+  export('/', fs)
 ctlfs = NineP::Server::HashFileSystem.
   new('welcome' => "Hello!\n",
       'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
-      'now' => lambda { Time.now })
-srvenv = NineP::Server::Environment.new(authsrv: auth).
-  export('/', fs).
-  export('ctl', ctlfs)
+      'now' => lambda { Time.now },
+      'stats' => lambda { format_server_stats(srvenv.stats) })
+srvenv.export('ctl', ctlfs)
 
 listen_sock = TCPServer.new(listen_on, port)
 
