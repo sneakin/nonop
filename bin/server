@@ -15,6 +15,7 @@ $verbose = false
 listen_on = nil
 port = 562
 auth_db_path = nil
+auth_provider = nil
 
 opts = OptionParser.new do |o|
   desc = 'Run a file server.'
@@ -32,6 +33,9 @@ opts = OptionParser.new do |o|
   end
   o.on('-l', '--listen HOST') do |v|
     listen_on = v
+  end
+  o.on('--auth-provider PATH') do |v|
+    auth_provider = v
   end
   o.on('--auth-db PATH') do |v|
     auth_db_path = v
@@ -259,7 +263,7 @@ module NineP
 
       def read fsid, count, offset = 0
         id_data = @fsids.fetch(fsid)
-        raise Errno::EACCESS unless id_data.reading?
+        raise Errno::EACCES unless id_data.reading?
         @entries.fetch(id_data.path).read(count, offset)
       rescue KeyError
         raise Errno::EBADFD
@@ -267,7 +271,7 @@ module NineP
 
       def write fsid, data, offset = 0
         id_data = @fsids.fetch(fsid)
-        raise Errno::EACCESS unless id_data.writing?
+        raise Errno::EACCES unless id_data.writing?
         @entries.fetch(id_data.path).write(data, offset)
       rescue KeyError
         raise Errno::EBADFD
@@ -325,6 +329,13 @@ module NineP
       end
     end
 
+    class YesAuth < AuthHash
+      def auth user, creds
+        return false unless has_user?(user)
+        true
+      end
+    end
+
     class MungeAuth < AuthHash
       def auth user, creds
         return false unless has_user?(user)
@@ -343,6 +354,9 @@ module NineP
       end
       def closed?
         @closed
+      end
+      def authentic? username, uid
+        false
       end
       def open flags
         raise Errno::ENOTSUP
@@ -381,9 +395,9 @@ module NineP
         data.size
       end
 
-      def authentic?
+      def authentic? uname, uid
         NineP.vputs { [ "Authenticating #{@user}", @data.inspect, @environment.find_user(@user).inspect ] }
-        @environment.auth(@user, @data)
+        (@user == uname || @user == uid) && @environment.auth(@user, @data)
       end
     end
 
@@ -538,30 +552,46 @@ module NineP
                                             version: NineP::NString.new(coder.version)))
         when NineP::L2000::Tauth then
           if environment.has_user?(pkt.data.n_uname)
-            @open_fids[0] = @auth_stream = AuthStream.new(environment, pkt.data.n_uname)
+            @open_fids[pkt.data.afid] = AuthStream.new(environment, pkt.data.n_uname)
             reply_to(pkt, NineP::L2000::Rauth.new(aqid: environment.auth_qid))
           else
             reply_to(pkt, NineP::L2000::Rerror.new(Errno::EACCES))
           end            
         when NineP::L2000::Tattach then
           # todo creates a fid
-          if pkt.data.afid == 0
-            if @auth_stream.authentic?
+          begin
+            stream = @open_fids.fetch(pkt.data.afid)
+            if stream.authentic?(pkt.data.uname, pkt.data.n_uname)
               @open_fids[pkt.data.fid] = ErrantStream.instance
               reply_to(pkt, NineP::L2000::Rattach.new(aqid: environment.auth_qid))
             else
               reply_to(pkt, NineP::L2000::Rerror.new(Errno::EACCES))
             end
-          elsif pkt.data.afid == 0xFFFFFFFF
-            begin
-              fs = environment.get_export(pkt.data.aname.to_s)
-              @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
-              reply_to(pkt, NineP::L2000::Rattach.new(aqid: fs.qid))
-            rescue KeyError
-              reply_to(pkt, NineP::L2000::Rerror.new(Errno::ENOENT))
+          rescue KeyError
+            if pkt.data.afid == 0xFFFFFFFF
+              begin
+                fs = environment.get_export(pkt.data.aname.to_s)
+
+                if pkt.data.uname != nil || 0xFFFFFFFF == pkt.data.n_uname
+                  # todo auth against per export databases
+                  user = pkt.data.n_uname == 0xFFFFFFFF ? pkt.data.uname.to_s : pkt.data.n_uname
+                  NineP.vputs { "Authenticating #{user}" }
+                  if environment.auth(user, nil)
+                    @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
+                    reply_to(pkt, NineP::L2000::Rattach.new(aqid: environment.auth_qid))
+                  else
+                    reply_to(pkt, NineP::L2000::Rerror.new(Errno::EACCES))
+                  end
+                else
+                  @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
+                  reply_to(pkt, NineP::L2000::Rattach.new(aqid: fs.qid))
+                end
+              rescue KeyError
+                reply_to(pkt, NineP::L2000::Rerror.new(Errno::ENOENT))
+              end
+            else
+              reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
             end
-          else
-            reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
           end
         when NineP::Twrite then
           begin
@@ -681,7 +711,11 @@ def format_server_stats stats
   stats.collect { "%-*s  %s" % [ max_name, _1, _2 ] }.join("\n") + "\n"
 end
 
-auth = NineP::Server::MungeAuth.new(users)
+auth = case auth_provider
+       when 'munge' then NineP::Server::MungeAuth.new(users)
+       when 'yes' then NineP::Server::YesAuth.new(users)
+       else raise ArgumentError.new("Unknown auth provider: #{auth_provider}")
+       end
 fs = NineP::Server::HashFileSystem.
   new('abcd' => "1234\n",
       "utf8.txt" => "😻\n")
