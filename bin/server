@@ -1,4 +1,5 @@
 #!/usr/bin/env -S bundle exec ruby
+# -*- coding: utf-8 -*-
 # -*-ruby-*-
 
 require 'sg/ext'
@@ -72,6 +73,9 @@ module NineP
 
     class HashFileSystem
       class Entry
+        attr_reader :name
+        attr_accessor :data
+        
         def initialize name, data
           @name = name
           @data = data
@@ -79,6 +83,10 @@ module NineP
         
         def qid
           @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:FILE], version: 0, path: @name[0, 8])
+        end
+
+        def type
+          0
         end
       end
       
@@ -118,7 +126,7 @@ module NineP
           [ [ qid ], 0 ]
         elsif path.size == 1
           i = next_id
-          @fsids[i] = path
+          @fsids[i] = path.last
           [ [ qid_for(path[0].to_s) ], i ]
         else
           false
@@ -127,13 +135,28 @@ module NineP
         false
       end
 
-      def readdir count, offset = 0
+      def readdir fsid, count, offset = 0
+        case fsid
+        when 0 then
+          @entries.values[offset, count]
+        else raise Errno::EINVAL
+        end
       end
 
-      def read count, offset = 0
+      def read fsid, count, offset = 0
+        entry = @entries.fetch(@fsids.fetch(fsid))
+        data = entry.data
+        data = case data
+               when Proc then data.call.to_s
+               when Pathname then data.read
+               else data
+               end
+        data[offset, count]
+      rescue KeyError
+        raise Errno::EINVAL
       end
 
-      def write data, offset = 0
+      def write fsid, data, offset = 0
       end
     end
 
@@ -189,6 +212,12 @@ module NineP
         @closed
       end
       def open flags
+        raise Errno::EINVAL
+      end
+      def readdir count, offset = 0
+        raise Errno::EINVAL
+      end
+      def read count, offset = 0
         raise Errno::EINVAL
       end
       def write data, offset = 0
@@ -349,9 +378,16 @@ module NineP
             reply_to(pkt, NineP::L2000::Rerror.new(Errno::EINVAL))
           end
         when NineP::Twrite then
-          stream = @open_fids[pkt.data.fid]
           begin
+            stream = @open_fids[pkt.data.fid]
             reply_to(pkt, NineP::Rwrite.new(count: stream.write(pkt.data.data, pkt.data.offset)))
+          rescue SystemCallError
+            reply_to(pkt, NineP::L2000::Rerror.new($!))
+          end
+        when NineP::Tread then
+          begin
+            stream = @open_fids[pkt.data.fid]
+            reply_to(pkt, NineP::Rread.new(data: stream.read(pkt.data.count, pkt.data.offset)))
           rescue SystemCallError
             reply_to(pkt, NineP::L2000::Rerror.new($!))
           end
@@ -364,7 +400,7 @@ module NineP
           end
         when NineP::Twalk then
           stream = @open_fids[pkt.data.fid]
-          qids, fsid = stream.walk(pkt.data.wnames)
+          qids, fsid = stream.walk(pkt.data.wnames.collect(&:to_s))
           NineP.vputs { "Walked #{pkt.data.wnames} #{qids.inspect}" }
           if qids && fsid
             new_stream = FileStream.new(stream.fs, pkt.data.fid, qids, fsid)
@@ -373,12 +409,26 @@ module NineP
           else
             reply_to(pkt, NineP::L2000::Rerror.new(Errno::EINVAL))
           end
-        when NineP::L2000::Topen then # todo
+        when NineP::L2000::Topen then
           stream = @open_fids[pkt.data.fid]
           NineP.vputs { "Opening #{pkt.data.fid} #{stream.inspect}" }
           begin
             stream.open(pkt.data.flags)
             reply_to(pkt, NineP::Ropen.new(qid: stream.qid, iounit: 0))
+          rescue SystemCallError
+            reply_to(pkt, NineP::L2000::Rerror.new($!))
+          end
+        when NineP::L2000::Treaddir then
+          stream = @open_fids[pkt.data.fid]
+          NineP.vputs { "Reading dir #{pkt.data.fid} #{stream.inspect}" }
+          begin
+            ents = stream.readdir(pkt.data.count, pkt.data.offset).
+              each.with_index.
+              collect { NineP::L2000::Rreaddir::Dirent.new(qid: _1.qid,
+                                                           offset: _2,
+                                                           type: _1.type,
+                                                           name: NineP::NString.new(_1.name)) }
+            reply_to(pkt, NineP::L2000::Rreaddir.new(entries: ents))
           rescue SystemCallError
             reply_to(pkt, NineP::L2000::Rerror.new($!))
           end
@@ -414,8 +464,13 @@ else
 end
 
 auth = NineP::Server::MungeAuth.new(users)
-fs = NineP::Server::HashFileSystem.new('a' => '1234')
-ctlfs = NineP::Server::HashFileSystem.new('stats' => 'hello')
+fs = NineP::Server::HashFileSystem.
+  new('a' => "1234\n",
+      "utf8.txt" => "😻\n")
+ctlfs = NineP::Server::HashFileSystem.
+  new('welcome' => "Hello!\n",
+      'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
+      'now' => lambda { Time.now })
 srvenv = NineP::Server::Environment.new(authsrv: auth).
   export('/', fs).
   export('ctl', ctlfs)
@@ -433,4 +488,4 @@ end
   Signal.trap(sig) { reactor.done! }
 end
 
-reactor.serve! timeout: 15
+reactor.serve! timeout: 5

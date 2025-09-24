@@ -5,7 +5,7 @@ require_relative '../packet-data'
 require_relative '../../qid'
 
 module NineP
-  module L2000
+  module L2000 # todo part of the base 9p?
     class Treaddir
       # size[4] Treaddir tag[2] fid[4] offset[8] count[4]
       include Packet::Data
@@ -28,8 +28,9 @@ module NineP
       include Packet::Data
       define_packing([:count, :uint32l],
                      [:data, :string, :count])
+      attributes :entries
       
-      def entries
+      def unpack_entries
         ents = []
         d = data
         while d != ""
@@ -37,6 +38,16 @@ module NineP
           ents << e
         end
         ents
+      end
+
+      def entries
+        @entries ||= unpack_entries
+      end
+      
+      def pack
+        self.data = entries.collect(&:pack).join
+        self.count = self.data.bytesize
+        super
       end
     end
   end

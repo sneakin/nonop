@@ -15,5 +15,6 @@ module NineP
     include Packet::Data
     define_packing([:count, :uint32l],
                    [:data, :string, :count])
+    calc_attr :count, lambda { data.bytesize }
   end
 end
