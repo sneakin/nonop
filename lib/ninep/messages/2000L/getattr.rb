@@ -3,6 +3,7 @@ using SG::Ext
 
 require_relative '../packet-data'
 require_relative '../../qid'
+require_relative '../../time_t'
 
 module NineP
   module L2000
@@ -32,6 +33,7 @@ module NineP
       init_attr :request_mask, Flags[:ALL]
     end
 
+    
     class Rgetattr
       include Packet::Data
       define_packing([ :valid, :uint64l ],
@@ -44,16 +46,32 @@ module NineP
                      [ :size, :uint64l ],
                      [ :blksize, :uint64l ],
                      [ :blocks, :uint64l ],
-                     [ :atime_sec, :uint64l ],
+                     [ :atime_sec, TimeT ],
                      [ :atime_nsec, :uint64l ],
-                     [ :mtime_sec, :uint64l ],
+                     [ :mtime_sec, TimeT ],
                      [ :mtime_nsec, :uint64l ],
-                     [ :ctime_sec, :uint64l ],
+                     [ :ctime_sec, TimeT ],
                      [ :ctime_nsec, :uint64l ],
-                     [ :btime_sec, :uint64l ],
+                     [ :btime_sec, TimeT ],
                      [ :btime_nsec, :uint64l ],
                      [ :gen, :uint64l ],
                      [ :data_version, :uint64l ])
+      def atime_sec= t
+        key = Integer === t ? :n : :t
+        @atime_sec = TimeT.new(key => t)
+      end
+      def mtime_sec= t
+        key = Integer === t ? :n : :t
+        @mtime_sec = TimeT.new(key => t)
+      end
+      def ctime_sec= t
+        key = Integer === t ? :n : :t
+        @ctime_sec = TimeT.new(key => t)
+      end
+      def btime_sec= t
+        key = Integer === t ? :n : :t
+        @btime_sec = TimeT.new(key => t)
+      end
     end
   end
 end

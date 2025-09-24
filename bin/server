@@ -69,9 +69,36 @@ module NineP
           false
         end
       end
+
+      # todo stub api
     end
 
     class HashFileSystem
+      BLOCK_SIZE = 4096
+
+      DEFAULT_DIR_ATTRS = {
+        valid: 1,
+        mode: 0040755,
+        uid: Process.uid,
+        gid: Process.gid,
+        nlink: 1,
+        rdev: 0,
+        blksize: BLOCK_SIZE,
+        atime_sec: Time.now,
+        atime_nsec: 0,
+        mtime_sec: Time.now,
+        mtime_nsec: 0,
+        ctime_sec: Time.now,
+        ctime_nsec: 0,
+        btime_sec: Time.now,
+        btime_nsec: 0,
+        gen: 0,
+        data_version: 0
+      }
+      
+      DEFAULT_FILE_ATTRS = DEFAULT_DIR_ATTRS.
+        merge(mode: 0100644)
+
       class Entry
         attr_reader :name
         attr_accessor :data
@@ -100,29 +127,53 @@ module NineP
           else @data
           end
         end
+
+        def read count, offset = 0
+          @attrs[:atime_sec] = Time.now
+          data[offset, count]
+        end
+
+        def close
+          self
+        end
         
+        def truncate size = 0
+          raise Errno::EINVAL unless String === @data
+          @data = @data[0, size]
+          @attrs[:ctime_sec] = Time.now
+          self
+        end
+
+        def write data, offset = 0
+          raise Errno::EINVAL unless String === @data
+          @data[offset, data.size] = data
+          @attrs[:mtime_sec] = Time.now
+          data.size # todo bytesize?
+        end
+
         def getattr
-          { valid: 1,
-            qid: qid,
-            mode: 0100644,
-            uid: Process.uid,
-            gid: Process.gid,
-            nlink: 1,
-            rdev: 0,
-            size: size,
-            blksize: 4096,
-            blocks: size / 4096,
-            atime_sec: 0,
-            atime_nsec: 0,
-            mtime_sec: 0,
-            mtime_nsec: 0,
-            ctime_sec: 0,
-            ctime_nsec: 0,
-            btime_sec: 0,
-            btime_nsec: 0,
-            gen: 0,
-            data_version: 0
-          }
+          @attrs ||= DEFAULT_FILE_ATTRS.merge(qid: qid)
+          @attrs.merge(size: size, blocks: size / BLOCK_SIZE)
+        end
+      end
+
+      class FSID
+        attr_accessor :path, :open_flags
+        def initialize path, open_flags: nil
+          @path = path
+          @open_flags = open_flags
+        end
+
+        def reading?
+          m = @open_flags & NineP::L2000::Topen::Mask[:MODE]
+          m == NineP::L2000::Topen::Flags[:RDONLY] ||
+            m == NineP::L2000::Topen::Flags[:RDWR]
+        end
+
+        def writing?
+          m = @open_flags & NineP::L2000::Topen::Mask[:MODE]
+          m == NineP::L2000::Topen::Flags[:WRONLY] ||
+            m == NineP::L2000::Topen::Flags[:RDWR]
         end
       end
       
@@ -142,14 +193,30 @@ module NineP
 
       def open fsid, flags
         NineP.vputs { "Opening #{fsid} #{@fsids[fsid]}" }
-        raise Errno::EINVAL unless fsid == 0 || @entries.has_key?(@fsids.fetch(fsid))
-        true
+        return if fsid == 0
+
+        id_data = @fsids.fetch(fsid)
+        entry = @entries[id_data.path]
+        if entry
+          id_data.open_flags = flags
+
+          case flags & NineP::L2000::Topen::Mask[:MODE]
+          when NineP::L2000::Topen::Flags[:RDONLY] then true
+          else
+            if 0 != (flags & (NineP::L2000::Topen::Flags[:CREATE] || NineP::L2000::Topen::Flags[:TRUNC]))
+              entry.truncate
+            end
+          end
+        else
+          raise Errno::EINVAL unless fsid == 0 || @entries.has_key?(@fsids.fetch(fsid).path)
+        end
       rescue KeyError
         raise Errno::EINVAL
       end
       
       def close fsid
-        @fsids.delete(fsid)
+        id_data = @fsids.delete(fsid)
+        self
       end
 
       def next_id
@@ -162,7 +229,7 @@ module NineP
           [ [ qid ], 0 ]
         elsif path.size == 1
           i = next_id
-          @fsids[i] = path.last
+          @fsids[i] = FSID.new(path.last)
           [ [ qid_for(path.last) ], i ]
         else
           false
@@ -180,42 +247,29 @@ module NineP
       end
 
       def read fsid, count, offset = 0
-        entry = @entries.fetch(@fsids.fetch(fsid))
-        data = entry.data
-        data[offset, count]
+        id_data = @fsids.fetch(fsid)
+        raise Errno::EINVAL unless id_data.reading?
+        @entries.fetch(id_data.path).read(count, offset)
       rescue KeyError
         raise Errno::EINVAL
       end
 
       def write fsid, data, offset = 0
+        id_data = @fsids.fetch(fsid)
+        raise Errno::EINVAL unless id_data.writing?
+        @entries.fetch(id_data.path).write(data, offset)
+      rescue KeyError
+        raise Errno::EINVAL
       end
 
-      def getattr fsid, mask
+      def getattr fsid
         if fsid == 0
-          { valid: 1,
-            qid: qid,
-            mode: 0040755,
-            uid: Process.uid,
-            gid: Process.gid,
-            nlink: 1,
-            rdev: 0,
-            size: @entries.size,
-            blksize: 4096,
-            blocks: @entries.size / 4096,
-            atime_sec: 0,
-            atime_nsec: 0,
-            mtime_sec: 0,
-            mtime_nsec: 0,
-            ctime_sec: 0,
-            ctime_nsec: 0,
-            btime_sec: 0,
-            btime_nsec: 0,
-            gen: 0,
-            data_version: 0
-          }
+          DEFAULT_DIR_ATTRS.
+            merge(qid: qid,
+                  size: @entries.size,
+                  blocks: @entries.size / BLOCK_SIZE)
         else
-          entry = @entries.fetch(@fsids.fetch(fsid))
-          entry.getattr
+          @entries.fetch(@fsids.fetch(fsid).path).getattr
         end
       end
     end
@@ -351,7 +405,7 @@ module NineP
       end
 
       def write data, offset = 0
-        @fs.write(data, offset)
+        @fs.write(@fsid, data, offset)
       end
 
       def walk path
@@ -359,7 +413,7 @@ module NineP
       end
 
       def getattr mask
-        @fs.getattr(@fsid, mask)
+        @fs.getattr(@fsid)
       end
     end
       
@@ -372,7 +426,7 @@ module NineP
       end
 
       def close
-        @fs.close(@fid)
+        self
       end
 
       def walk path
@@ -380,7 +434,7 @@ module NineP
       end
 
       def getattr mask
-        @fs.getattr(0, mask)
+        @fs.getattr(0)
       end
     end
       
@@ -550,6 +604,7 @@ module NineP
             stream = @open_fids[pkt.data.fid]
             NineP.vputs { "Getattr #{pkt.data.fid} #{stream.inspect}" }
             stats = stream.getattr(pkt.data.request_mask)
+            NineP.vputs { "   #{stats.inspect}" }
             reply_to(pkt, NineP::L2000::Rgetattr.new(**stats))
           rescue SystemCallError
             reply_to(pkt, NineP::L2000::Rerror.new($!))

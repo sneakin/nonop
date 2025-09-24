@@ -28,6 +28,10 @@ module NineP
         CLOEXEC:       02000000,
         SYNC:          04000000
       }
+      Mask = {
+        MODE: 0xF,
+        OPTS: 0xFFFFFFF0,
+      }
       
       # size[4] Tlopen tag[2] fid[4] flags[4]
       include Packet::Data

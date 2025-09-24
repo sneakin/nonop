@@ -132,7 +132,7 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, 
                [ max_name, ent.name.to_s, SystemCallError.new(ent_stats.code) ])
         elsif ent_stats && !short_list
           puts("  \e[1m%-*s \e[0;37m%8i %6o %8s %8s %18s\e[0m" %
-               [ max_name, ent.name.to_s, ent_stats.size, ent_stats.mode, ent_stats.uid, ent_stats.gid, Time.at(ent_stats.mtime_sec).strftime("%x %X") ])
+               [ max_name, ent.name.to_s, ent_stats.size, ent_stats.mode, ent_stats.uid, ent_stats.gid, ent_stats.mtime_sec.strftime("%x %X") ])
         else
           puts("  \e[1m%-*s\e[0m" %
                [ max_name, ent.name.to_s ])
