@@ -76,7 +76,7 @@ end
 # A read loop
 def read_fn file, offset, length, &blk
   # todo move into RemoteFile?
-  NineP::Async.reduce(0.upto(NineP::MAX_U64), 0) do |count, offset, &cc|
+  NineP::Async.reduce(0.upto(NineP::MAX_U64), offset) do |count, offset, &cc|
     file.read(length, offset: offset) do |data|
       raise data if StandardError === data # todo where is it handled?
       blk.call(data)
@@ -96,6 +96,8 @@ client.start do |pkt|
       raise attachment if StandardError === attachment
       # A loop through the paths but only after tte callbacks complete
       NineP::Async.reduce(paths, []) do |path, counts, &cc|
+        path, offset = [ $1, $2 ] if path =~ /(.+):(\d+)$/
+        offset = offset.to_i if offset
         attachment.open(path, flags: [:RDONLY]) do |file|
           fin = lambda do |final_count|
             NineP.vputs { paths.zip(final_count).to_a.inspect }
@@ -106,7 +108,7 @@ client.start do |pkt|
             cc.call(false, counts + [ file ], &fin)
           else
             count = 0
-            read_fn(file, 0, buffer_size) do |data|
+            read_fn(file, offset || 0, buffer_size) do |data|
               if data
                 $stdout.write(data)
                 count += data.bytesize
