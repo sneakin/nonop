@@ -139,7 +139,7 @@ module NineP
         end
 
         def read count, offset = 0
-          @attrs[:atime_sec] = Time.now
+          attrs[:atime_sec] = Time.now
           data[offset, count]
         end
 
@@ -150,23 +150,27 @@ module NineP
         def truncate size = 0
           raise Errno::ENOTSUP unless String === @data
           @data = @data[0, size]
-          @attrs[:ctime_sec] = Time.now
+          attrs[:ctime_sec] = Time.now
           self
         end
 
         def write data, offset = 0
           raise Errno::ENOTSUP unless String === @data
           @data[offset, data.size] = data
-          @attrs[:mtime_sec] = Time.now
+          attrs[:mtime_sec] = Time.now
           data.size # todo bytesize?
         end
 
-        def getattr
+        def attrs
           @attrs ||= DEFAULT_FILE_ATTRS.
             merge(qid: qid,
                   mode: MODE_FILE | (String === @data ? MODE_WRITEABLE : MODE_READABLE))
-          @attrs.merge(size: size, blocks: size / BLOCK_SIZE)
         end
+        
+        def getattr
+          attrs.merge(size: size, blocks: size / BLOCK_SIZE)
+        end
+
       end
 
       class FSID
