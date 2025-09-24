@@ -15,7 +15,7 @@ module NineP
       @attachment = attachment
       @flags = L2000::Topen.flag_mask(flags || [:RDONLY])
       @fid = fid || client.next_fid
-      @io = RemoteIO.new(client, @fid)
+      @io = RemoteIO.new(client, @fid, path)
       open(mode: mode, gid: gid, &blk)
     end
 

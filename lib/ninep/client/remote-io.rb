@@ -7,11 +7,12 @@ require_relative '../remote-path'
 
 module NineP
   class RemoteIO
-    attr_reader :client, :fid
+    attr_reader :client, :fid, :path
     
-    def initialize client, fid
+    def initialize client, fid, path
       @client = client
       @fid = fid
+      @path = path
     end
 
     def close &blk

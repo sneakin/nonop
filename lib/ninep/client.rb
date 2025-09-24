@@ -189,7 +189,7 @@ module NineP
           @afid = auth_fid
           @aqid = pkt.aqid
           # write credentials to afid
-          io = RemoteIO.new(self, auth_fid)
+          io = RemoteIO.new(self, auth_fid, 'auth')
           blk&.call(io) do |&cc|
             io.close(&cc)
           end
