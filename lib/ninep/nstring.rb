@@ -27,8 +27,14 @@ module NineP
       value
     end
 
+    alias to_str to_s
+
     def == other
-      self.class === other && value == other.value
+      case other
+      when self.class then value == other.value
+      when String then value == other
+      else false
+      end
     end
 
     def <=> other
