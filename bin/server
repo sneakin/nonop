@@ -56,7 +56,7 @@ module NineP
       end
       
       def qid
-        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:DIR], version: 0, path: '/')
+        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:MOUNT], version: 0, path: '/')
       end
 
       def close fid
@@ -200,7 +200,7 @@ module NineP
       end
       
       def qid
-        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:DIR], version: 0, path: '')
+        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:MOUNT], version: 0, path: '/')
       end
 
       def qid_for path
@@ -238,11 +238,24 @@ module NineP
       def next_id
         @next_id += 1
       end
+
+      def fsid_path fsid
+        fsid == 0 ? '/' : @fsids.fetch(fsid).path
+      end
       
-      def walk path
-        NineP.vputs { "Walking to #{path}" }
+      def walk path, old_fsid = nil
+        NineP.vputs { "Walking to #{path} #{old_fsid}" }
         if path.size == 0
-          [ [ qid ], 0 ]
+          if old_fsid == 0
+            [ [], 0 ]
+          else
+            i = next_id
+            @fsids[i] = case old_fsid
+                        when nil then FSID.new(path.last)
+                        else @fsids.fetch(old_fsid).dup
+                        end
+            [ [], i ]
+          end
         elsif path.size == 1
           i = next_id
           @fsids[i] = FSID.new(path.last)
@@ -250,7 +263,7 @@ module NineP
           if entry
             [ [ entry.qid ], i ]
           else
-            [ [], i ]
+            false
           end
         else
           false
@@ -260,7 +273,7 @@ module NineP
       def readdir fsid, count, offset = 0
         case fsid
         when 0 then
-          @entries.values[offset, count]
+          @entries.values[offset, count] || []
         else raise Errno::EBADFD
         end
       end
@@ -387,10 +400,10 @@ module NineP
     end
 
     class AuthStream < Stream
-      def initialize environment, user
+      def initialize environment, user, data = nil
         @environment = environment
         @user = user
-        @data = ''
+        @data = data || ''
       end
 
       def write data, offset = 0
@@ -403,10 +416,14 @@ module NineP
         NineP.vputs { [ "Authenticating #{@user}", @data.inspect, @environment.find_user(@user).inspect ] }
         (@user == uname || @user == uid) && @environment.auth(@user, @data)
       end
+
+      def dup
+        self.class.new(environment, user, data)
+      end
     end
 
     class FileStream < Stream
-      attr_reader :fs, :fid, :fsid
+      attr_reader :fs, :fid, :qids, :fsid
       
       def initialize fs, fid, qids, fsid
         @fs = fs
@@ -415,8 +432,12 @@ module NineP
         @fsid = fsid
       end
 
+      def dup
+        self.class.new(fs, fid, qids, fsid)
+      end
+
       def qid
-        @qids[-1]
+        @qid ||= @qids[-1] || NineP::Qid.new(type: NineP::Qid::Types[:FILE], version: 0, path: @fs.fsid_path(@fsid)[0, 8])
       end
 
       def close
@@ -440,7 +461,7 @@ module NineP
       end
 
       def walk path
-        @fs.walk(path)
+        @fs.walk(path, @fsid)
       end
 
       def getattr mask
@@ -456,12 +477,16 @@ module NineP
         @fid = fid
       end
 
+      def dup
+        self.class.new(fs, fid)
+      end
+
       def close
         self
       end
 
       def walk path
-        @fs.walk(path)
+        @fs.walk(path, 0)
       end
 
       def getattr mask
@@ -624,11 +649,12 @@ module NineP
           end
         when NineP::Twalk then
           begin
+            # Empty list needs to make a new fid
             stream = @open_fids.fetch(pkt.data.fid)
             qids, fsid = stream.walk(pkt.data.wnames.collect(&:to_s))
             NineP.vputs { "Walked #{pkt.data.wnames} #{qids.inspect}" }
             if qids && fsid
-              new_stream = FileStream.new(stream.fs, pkt.data.fid, qids, fsid)
+              new_stream = FileStream.new(stream.fs, pkt.data.newfid, qids, fsid)
               @open_fids[pkt.data.newfid] = new_stream
               reply_to(pkt, NineP::Rwalk.new(wqid: qids))
             else
@@ -641,10 +667,11 @@ module NineP
           end
         when NineP::L2000::Topen then
           stream = @open_fids.fetch(pkt.data.fid)
-          NineP.vputs { "Opening #{pkt.data.fid} #{stream.inspect}" }
+          NineP.vputs { "Opening #{pkt.data.fid} #{stream.qid.inspect} #{stream.inspect}" }
           begin
             stream.open(pkt.data.flags)
-            reply_to(pkt, NineP::Ropen.new(qid: stream.qid, iounit: 0))
+            reply_to(pkt, NineP::Ropen.new(qid: stream.qid || stream.fs.qid,
+                                           iounit: 0))
           rescue KeyError
             reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
           rescue SystemCallError
@@ -657,7 +684,7 @@ module NineP
             ents = stream.readdir(pkt.data.count, pkt.data.offset).
               each.with_index.
               collect { NineP::L2000::Rreaddir::Dirent.new(qid: _1.qid,
-                                                           offset: _2,
+                                                           offset: _2 + 1,
                                                            type: _1.type,
                                                            name: NineP::NString.new(_1.name)) }
             reply_to(pkt, NineP::L2000::Rreaddir.new(entries: ents))
