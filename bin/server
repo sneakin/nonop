@@ -16,6 +16,7 @@ listen_on = nil
 port = 562
 auth_db_path = nil
 auth_provider = 'munge'
+default_umask = File.umask
 
 opts = OptionParser.new do |o|
   desc = 'Run a file server.'
@@ -39,6 +40,9 @@ opts = OptionParser.new do |o|
   end
   o.on('--auth-db PATH') do |v|
     auth_db_path = v
+  end
+  o.on('--umask MASK') do |v|
+    default_umask = v.to_i
   end
 end
 args = opts.parse(ARGV)
@@ -82,12 +86,12 @@ module NineP
 
       MODE_DIR = 040000
       MODE_FILE = 0100000
-      MODE_WRITEABLE = 0644
+      MODE_WRITEABLE = 0664
       MODE_READABLE = 0444
-      MODE_EXECUTABLE = 0755
+      MODE_EXECUTABLE = 0775
       
       DEFAULT_DIR_ATTRS = {
-        valid: 1,
+        valid: 0xFFFF, # mask of set fields
         mode: MODE_DIR | MODE_EXECUTABLE,
         uid: Process.uid,
         gid: Process.gid,
@@ -107,15 +111,16 @@ module NineP
       }
 
       DEFAULT_FILE_ATTRS = DEFAULT_DIR_ATTRS.
-        merge(mode: MODE_FILE | MODE_WRITEABLE)
+        merge(mode: MODE_FILE | MODE_READABLE)
 
       class Entry
         attr_reader :name
         attr_accessor :data
         
-        def initialize name, data
+        def initialize name, data, umask: nil
           @name = name
           @data = data
+          @umask = umask || File.umask
         end
         
         def qid
@@ -164,7 +169,7 @@ module NineP
         def attrs
           @attrs ||= DEFAULT_FILE_ATTRS.
             merge(qid: qid,
-                  mode: MODE_FILE | (String === @data ? MODE_WRITEABLE : MODE_READABLE))
+                  mode: MODE_FILE | ((String === @data ? MODE_WRITEABLE : MODE_READABLE) & ~@umask))
         end
         
         def getattr
@@ -193,8 +198,8 @@ module NineP
         end
       end
       
-      def initialize entries = nil
-        @entries = Hash[(entries || {}).collect { |name, data| [ name,  Entry.new(name, data) ] }]
+      def initialize entries: nil, umask: nil
+        @entries = Hash[(entries || {}).collect { |name, data| [ name,  Entry.new(name, data, umask: umask) ] }]
         @next_id = 0
         @fsids = {}
       end
@@ -299,12 +304,13 @@ module NineP
           DEFAULT_DIR_ATTRS.
             merge(qid: qid,
                   size: @entries.size,
+                  mode: MODE_DIR | MODE_EXECUTABLE,
                   blocks: @entries.size / BLOCK_SIZE)
         else
           @entries.fetch(@fsids.fetch(fsid).path).getattr
         end
       rescue KeyError
-        raise Errno::EBADFD
+        raise Errno::ENOENT
       end
     end
 
@@ -634,7 +640,7 @@ module NineP
         when NineP::Tread then
           begin
             stream = @open_fids.fetch(pkt.data.fid)
-            reply_to(pkt, NineP::Rread.new(data: stream.read(pkt.data.count, pkt.data.offset)))
+            reply_to(pkt, NineP::Rread.new(data: stream.read(pkt.data.count, pkt.data.offset) || ''))
           rescue KeyError
             reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
           rescue SystemCallError
@@ -696,7 +702,7 @@ module NineP
         when NineP::L2000::Tgetattr then
           begin
             stream = @open_fids.fetch(pkt.data.fid)
-            NineP.vputs { "Getattr #{pkt.data.fid} #{stream.inspect}" }
+            NineP.vputs { "Getattr #{pkt.data.fid}" }
             stats = stream.getattr(pkt.data.request_mask)
             NineP.vputs { "   #{stats.inspect}" }
             reply_to(pkt, NineP::L2000::Rgetattr.new(**stats))
@@ -748,15 +754,21 @@ auth = case auth_provider
        else raise ArgumentError.new("Unknown auth provider: #{auth_provider}")
        end
 fs = NineP::Server::HashFileSystem.
-  new('abcd' => "1234\n",
-      "utf8.txt" => "😻\n")
+  new(umask: default_umask,
+      entries: {
+        'abcd' => "1234\n",
+        "utf8.txt" => "😻\n"
+      })
 srvenv = NineP::Server::Environment.new(authsrv: auth).
   export('/', fs)
 ctlfs = NineP::Server::HashFileSystem.
-  new('welcome' => "Hello!\n",
-      'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
-      'now' => lambda { Time.now },
-      'stats' => lambda { format_server_stats(srvenv.stats) })
+  new(umask: default_umask,
+      entries: {
+        'welcome' => "Hello!\n",
+        'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
+        'now' => lambda { Time.now },
+        'stats' => lambda { format_server_stats(srvenv.stats) }
+      })
 srvenv.export('ctl', ctlfs)
 
 listen_sock = TCPServer.new(listen_on, port)
