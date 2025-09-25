@@ -15,7 +15,7 @@ $verbose = false
 listen_on = nil
 port = 562
 auth_db_path = nil
-auth_provider = nil
+auth_provider = 'munge'
 
 opts = OptionParser.new do |o|
   desc = 'Run a file server.'
