@@ -33,7 +33,6 @@ module NineP
       init_attr :request_mask, Flags[:ALL]
     end
 
-    
     class Rgetattr
       include Packet::Data
       define_packing([ :valid, :uint64l ],
