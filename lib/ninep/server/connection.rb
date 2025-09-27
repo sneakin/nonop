@@ -92,6 +92,7 @@ module NineP::Server
     end
 
     def on_attach pkt
+      # todo the  fid ties the user to the export via fid cloning
       stream = @open_fids.fetch(pkt.data.afid)
       if stream.authentic?(pkt.data.uname, pkt.data.n_uname)
         @open_fids[pkt.data.fid] = ErrantStream.instance
@@ -101,31 +102,34 @@ module NineP::Server
       end
     rescue KeyError
       if pkt.data.afid == 0xFFFFFFFF
-        begin
-          fs = environment.get_export(pkt.data.aname.to_s)
-
-          if pkt.data.uname != nil || 0xFFFFFFFF == pkt.data.n_uname
-            # todo auth against per export databases
-            user = pkt.data.n_uname == 0xFFFFFFFF ? pkt.data.uname.to_s : pkt.data.n_uname
-            NineP.vputs { "Authenticating #{user}" }
-            if environment.auth(user, nil)
-              @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
-              reply_to(pkt, NineP::L2000::Rattach.new(aqid: environment.auth_qid))
-            else
-              reply_to(pkt, NineP::L2000::Rerror.new(Errno::EACCES))
-            end
-          else
-            @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
-            reply_to(pkt, NineP::L2000::Rattach.new(aqid: fs.qid))
-          end
-        rescue KeyError
-          reply_to(pkt, NineP::L2000::Rerror.new(Errno::ENOENT))
-        end
+        on_legacy_auth(pkt)
       else
         reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
       end
     end
 
+    def on_legacy_auth pkt
+      fs = environment.get_export(pkt.data.aname.to_s)
+
+      if pkt.data.uname != nil || 0xFFFFFFFF == pkt.data.n_uname
+        # todo auth against per export databases
+        user = pkt.data.n_uname == 0xFFFFFFFF ? pkt.data.uname.to_s : pkt.data.n_uname
+        NineP.vputs { "Authenticating #{user}" }
+        if environment.auth(user, nil)
+          @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
+          reply_to(pkt, NineP::L2000::Rattach.new(aqid: environment.auth_qid))
+        else
+          reply_to(pkt, NineP::L2000::Rerror.new(Errno::EACCES))
+        end
+      else
+        @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
+        reply_to(pkt, NineP::L2000::Rattach.new(aqid: fs.qid))
+      end
+    rescue KeyError
+      reply_to(pkt, NineP::L2000::Rerror.new(Errno::ENOENT))
+    end
+
+    # todo async reply
     def on_write pkt
       stream = @open_fids.fetch(pkt.data.fid)
       reply_to(pkt, NineP::Rwrite.new(count: stream.write(pkt.data.data, pkt.data.offset)))
@@ -135,6 +139,7 @@ module NineP::Server
       reply_to(pkt, NineP::L2000::Rerror.new($!))
     end
 
+    # todo async reply
     def on_read pkt
       stream = @open_fids.fetch(pkt.data.fid)
       reply_to(pkt, NineP::Rread.new(data: stream.read(pkt.data.count, pkt.data.offset) || ''))
