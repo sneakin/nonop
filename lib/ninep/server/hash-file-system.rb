@@ -49,7 +49,7 @@ module NineP::Server
           @mode = @data = nil
         end
         
-        delegate :truncate, :read, :write, to: :data
+        delegate :truncate, :read, :write, :readdir, to: :data
 
         def writeable?
           (nil != @mode) &&
@@ -327,6 +327,63 @@ module NineP::Server
       end
     end
 
+    class DirectoryEntry < Entry
+      class DataProvider < Entry::DataProvider
+        attr_reader :entry
+        
+        def initialize entry
+          @entry = entry
+        end
+        
+        def readdir count, offset = 0
+          entry.attrs[:atime_sec] = Time.now
+          entry.readdir(count, offset)
+        end
+      end
+
+      attr_reader :entries
+      
+      def initialize name, umask: nil, entries:
+        super(name, umask:)
+        @entries = Hash[(entries || {}).collect { |name, data|
+                          [ name,
+                            case data
+                            when Entry then data
+                            when String then BufferEntry.new(name, data, umask: umask)
+                            when Pathname then FileEntry.new(name, path: data, umask: umask)
+                            when Hash then DirectoryEntry.new(name, entries: data, umask: umask)
+                            else StaticEntry.new(name, data, umask: umask)
+                            end
+                          ]}]
+      end
+
+      def qid
+        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:DIR],
+                                version: 0,
+                                path: @name[0, 8])
+      end
+
+      def open p9_mode
+        super(p9_mode, DataProvider.new(self))
+      end
+      
+      def size
+        entries.size
+      end
+
+      def readdir count, offset = 0
+        @entries.values[offset, count] || []
+      end
+
+      def getattr
+        DEFAULT_DIR_ATTRS.
+          merge(qid: qid,
+                size: @entries.size,
+                mode: (PermMode::DIR | MODE_EXECUTABLE) & ~umask,
+                blocks: @entries.size / BLOCK_SIZE)
+      end
+    end
+    
     # Provides the operations for ~fsid~ numbers to reference an OpenedEntry.
     class FSID
       attr_accessor :path, :entry, :backend, :open_flags
@@ -367,9 +424,11 @@ module NineP::Server
         self
       end
       
-      delegate :truncate, :read, :write, to: :backend
+      delegate :truncate, :read, :write, :readdir, to: :backend
       delegate :size, :getattr, to: :entry
     end
+
+    attr_reader :entries
     
     def initialize entries: nil, umask: nil
       @entries = Hash[(entries || {}).collect { |name, data|
@@ -378,6 +437,7 @@ module NineP::Server
                           when Entry then data
                           when String then BufferEntry.new(name, data, umask: umask)
                           when Pathname then FileEntry.new(name, path: data, umask: umask)
+                          when Hash then DirectoryEntry.new(name, entries: data, umask: umask)
                           else StaticEntry.new(name, data, umask: umask)
                           end
                         ]}]
@@ -418,38 +478,64 @@ module NineP::Server
     end
     
     def walk path, old_fsid = nil
-      NineP.vputs { "Walking to #{path} #{old_fsid}" }
       if path.size == 0
+        NineP.vputs { "Cloning #{old_fsid}" }
         if old_fsid == 0
           [ [], 0 ]
         else
           i = next_id
           @fsids[i] = case old_fsid
-                      when nil then FSID.new(path.last, @entries.fetch(path.last))
+                      when nil then FSID.new(path.last, @entries.fetch(path.last)) # fixme
                       else @fsids.fetch(old_fsid).dup
                       end
           [ [], i ]
         end
-      elsif path.size == 1
-        i = next_id
-        entry = @entries.fetch(path.last)
-        @fsids[i] = FSID.new(path.last, entry)
-        if entry
-          [ [ entry.qid ], i ]
-        else
-          false
-        end
       else
-        false
+        i = next_id
+        NineP.vputs { "Walking #{i} to #{path} #{old_fsid}" }
+        steps, entry = find_entry(path, old_fsid != nil && old_fsid != 0 ? @fsids.fetch(old_fsid).entry : nil)
+        if entry
+          @fsids[i] = FSID.new(entry.name, entry)
+          [ steps.collect(&:qid), i ]
+        else
+          [ steps.collect(&:qid), steps.last&.qid || 0 ]
+          # false
+        end
       end
+    end
+
+    def find_entry path, dir
+      parts = []
+      head = nil
+      rest = path
+      dir ||= self
+
+      begin
+        head, rest = rest.split_at(1)
+        head = head.first
+        NineP.vputs { "Finding #{head.inspect} / #{rest.inspect}" }
+        ent = dir.entries[head]
+        if ent
+          parts << ent
+          return [ parts, ent ] if rest.empty?
+        end
+        dir = ent
+      end while dir && !rest.empty?
+
+      return [ parts, nil ]
     end
 
     def readdir fsid, count, offset = 0
       case fsid
       when 0 then
         @entries.values[offset, count] || []
-      else raise Errno::EBADFD
+      else
+        id_data = @fsids.fetch(fsid)
+        raise Errno::EACCES unless id_data.reading?
+        id_data.readdir(count, offset)
       end
+    rescue KeyError
+      raise Errno::EBADFD
     end
 
     def read fsid, count, offset = 0
@@ -476,7 +562,7 @@ module NineP::Server
                 mode: PermMode::DIR | MODE_EXECUTABLE,
                 blocks: @entries.size / BLOCK_SIZE)
       else
-        @entries.fetch(@fsids.fetch(fsid).path).getattr
+        @fsids.fetch(fsid).getattr
       end
     rescue KeyError
       raise Errno::ENOENT

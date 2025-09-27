@@ -17,6 +17,7 @@ port = 562
 auth_db_path = nil
 auth_provider = 'munge'
 default_umask = File.umask
+reactor_timeout = 5 # secs
 
 opts = OptionParser.new do |o|
   desc = 'Run a file server.'
@@ -43,6 +44,9 @@ opts = OptionParser.new do |o|
   end
   o.on('--umask MASK') do |v|
     default_umask = v.to_i
+  end
+  o.on('--timeout SECS') do |v|
+    reactor_timeout = v.to_i
   end
 end
 args = opts.parse(ARGV)
@@ -95,20 +99,25 @@ ctlfs = NineP::Server::HashFileSystem.
         'welcome' => "Hello!\n",
         'scratch' => NineP::Server::HashFileSystem::FileEntry.new('scratch', path: scratch_file.path, writeable: true),
         'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
-        'now' => lambda { Time.now },
-        'stats' => lambda { format_server_stats(srvenv.stats) },
-        'verbose' => NineP::Server::HashFileSystem::WriteableEntry.new('verbose') { |entry, data = nil, offset = 0|
-          if data
-            $verbose = entry.data.strip.to_bool
-          end
-          entry.data = $verbose.to_s + "\n"
+        'info' => {
+          'now' => lambda { Time.now },
+          'stats' => lambda { format_server_stats(srvenv.stats) },
         },
-        'done' => NineP::Server::HashFileSystem::WriteableEntry.new('done') { |entry, data = nil, offset = 0|
-          if data
-            srvenv.done! { reactor.done! } if entry.data.strip.to_bool == true
-          end
-          entry.data || reactor.done?.to_s + "\n"
-        }
+        'config' => {
+          'README' => "Configure the server by writing to these files.\n",
+          'verbose' => NineP::Server::HashFileSystem::WriteableEntry.new('verbose') { |entry, data = nil, offset = 0|
+            if data
+              $verbose = entry.data.strip.to_bool
+            end
+            entry.data = $verbose.to_s + "\n"
+          },
+          'done' => NineP::Server::HashFileSystem::WriteableEntry.new('done') { |entry, data = nil, offset = 0|
+            if data && entry.data.strip.to_bool
+              srvenv.done! { reactor.done! } 
+            end
+            entry.data || reactor.done?.to_s + "\n"
+          }
+        },
       })
 srvenv.export('ctl', ctlfs)
 
@@ -123,6 +132,6 @@ end
   Signal.trap(sig) { reactor.done! }
 end
 
-reactor.serve! timeout: 5
+reactor.serve! timeout: reactor_timeout
 
 puts("Goodbye.")
