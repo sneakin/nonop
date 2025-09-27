@@ -190,6 +190,25 @@ module NineP::Server
       end
     end
 
+    QidDirentMap = {
+      DIR: :DIR,
+      APPEND: :REG,
+      EXCL: :REG,
+      MOUNT: :DIR,
+      AUTH: :FIFO,
+      TMP: :REG,
+      SYMLINK: :LNK,
+      LINK: :LNK,
+      FILE: :REG,
+    }.reduce(Hash.new(NineP::L2000::DirentTypes[:UNKNOWN])) do |h, (k, v)|
+      h[NineP::Qid::Types[k]] = NineP::L2000::DirentTypes[v]
+      h
+    end
+    
+    def map_qid_to_dirent_type qid
+      QidDirentMap.fetch(qid.type)
+    end
+
     def on_readdir pkt
       stream = @open_fids.fetch(pkt.data.fid)
       NineP.vputs { "Reading dir #{pkt.data.fid} #{stream.inspect}" }
@@ -197,7 +216,7 @@ module NineP::Server
         each.with_index.
         collect { NineP::L2000::Rreaddir::Dirent.new(qid: _1.qid,
                                                      offset: _2 + 1,
-                                                     type: _1.type,
+                                                     type: map_qid_to_dirent_type(_1.qid),
                                                      name: NineP::NString.new(_1.name)) }
       reply_to(pkt, NineP::L2000::Rreaddir.new(entries: ents))
     rescue KeyError

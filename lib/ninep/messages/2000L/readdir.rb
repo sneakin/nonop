@@ -6,6 +6,18 @@ require_relative '../../qid'
 
 module NineP
   module L2000 # todo part of the base 9p?
+    DirentTypes = {
+      UNKNOWN: 0,
+      FIFO:    1,
+      CHR:     2,
+      DIR:     4,
+      BLK:     6,
+      REG:     8,
+      LNK:     10,
+      SOCK:    12,
+      WHT:     14
+    }
+
     class Treaddir
       # size[4] Treaddir tag[2] fid[4] offset[8] count[4]
       include Packet::Data
