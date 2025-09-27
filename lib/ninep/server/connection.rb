@@ -18,6 +18,12 @@ module NineP::Server
       env.track_connection(self)
     end
 
+    def to_s
+      "\#<%s %s:%s>" % [ self.class.name,
+                         @io.remote_address.ip_address,
+                         @io.remote_address.ip_port ]
+    end
+    
     def close
       return if closed?
       NineP.vputs { "Closing #{self}" }
@@ -64,8 +70,9 @@ module NineP::Server
         $stderr.puts("Error on #{io}: #{$!.message}")
       end
       close
-    rescue NineP::Error
+    rescue
       $stderr.puts("Error on #{io}: #{$!.message}")
+      NineP.vputs { $!.backtrace.join("\n") }
       reply_to(pkt, NineP::L2000::Rerror.new($!))
       close
     end

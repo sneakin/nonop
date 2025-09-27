@@ -105,7 +105,7 @@ module NineP
 
     def send_one pkt, io
       pkt.type = @packet_types_inv[pkt.coder]
-      NineP.vputs { "<< %s %i %s" % [ pkt.type, pkt.size, pkt.inspect ] }
+      NineP.vputs { "<< %s %i %s" % [ pkt.type, pkt.tag, pkt.size, pkt.inspect ] }
       data = pkt.pack
       NineP.vputs { "   %s %i %s" % [ pkt.coder, data.size, data.inspect ] }
       io.write(data)
@@ -119,7 +119,7 @@ module NineP
         raise DecodeError.new(-1, nil, nil)
       end
       pkt.coder = packet_types[pkt.type]
-      NineP.vputs { ">> %s %s %s" % [ pkt.tag, pkt.type, pkt.data.inspect ] }
+      NineP.vputs { ">> %s %s %s" % [ pkt.type, pkt.tag, pkt.data.inspect ] }
       raise DecodeError.new(-1, pkt, more) if NopDecoder === pkt.coder || !more.blank?
       pkt
 
