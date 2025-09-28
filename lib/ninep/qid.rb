@@ -4,6 +4,9 @@ using SG::Ext
 require 'sg/packed_struct'
 
 module NineP
+  # @attr type [Integer]
+  # @attr version [Integer]
+  # @attr path [String]
   class Qid
     Types = {
       DIR: 0x80,
@@ -22,5 +25,12 @@ module NineP
     define_packing([:type, :uint8],
                    [:version, :uint32l],
                    [:path, :string, 8])
+
+    # @!method initialize(*ary, **hash)
+    #   @param ary [Array]
+    #   @param hash [Hash<Symbol, Object>]
+    #   @option hash type [Integer]
+    #   @option hash version [Integer]
+    #   @option hash path [String]
   end
 end

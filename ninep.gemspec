@@ -16,4 +16,5 @@ Gem::Specification.new do |s|
   s.add_dependency 'sg'
   s.add_dependency 'rdoc'
   s.add_dependency 'rspec'
+  s.add_development_dependency 'solargraph'
 end
