@@ -15,6 +15,9 @@ module NineP::Server
     def open flags
       raise Errno::ENOTSUP
     end
+    def create name, flags, mode, gid
+      raise Errno::ENOTSUP
+    end
     def readdir count, offset = 0
       raise Errno::ENOTSUP
     end
@@ -28,6 +31,9 @@ module NineP::Server
       raise Errno::ENOTSUP
     end
     def getattr mask
+      raise Errno::ENOTSUP
+    end
+    def setattr attrs
       raise Errno::ENOTSUP
     end
   end

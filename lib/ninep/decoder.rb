@@ -105,7 +105,7 @@ module NineP
 
     def send_one pkt, io
       pkt.type = @packet_types_inv[pkt.coder]
-      NineP.vputs { "<< %s %i %s" % [ pkt.type, pkt.tag, pkt.size, pkt.inspect ] }
+      NineP.vputs { "<< %s %i %s\n\t%s" % [ pkt.type, pkt.tag, pkt.size, pkt.inspect ] }
       data = pkt.pack
       NineP.vputs { "   %s %i %s" % [ pkt.coder, data.size, data.inspect ] }
       io.write(data)

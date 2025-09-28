@@ -110,6 +110,10 @@ module NineP::Server
       def close
         self
       end
+
+      def create name, flags, mode, gid
+        raise Errno::ENOTSUP
+      end
       
       def attrs
         @attrs ||= DEFAULT_FILE_ATTRS.
@@ -119,6 +123,10 @@ module NineP::Server
       
       def getattr
         attrs.merge(size: size, blocks: size / BLOCK_SIZE)
+      end
+
+      def setattr attrs
+        raise Errno::ENOTSUP
       end
     end
 
@@ -203,15 +211,15 @@ module NineP::Server
           open if @io == nil
           @io
         end
-        
-        def read count, offset = 0
-          io.seek(offset)
-          io.read(count)
-        end
 
         def truncate size = 0
           io.truncate(size)
           self
+        end
+
+        def read count, offset = 0
+          io.seek(offset)
+          io.read(count)
         end
 
         def write data, offset = 0
@@ -249,6 +257,12 @@ module NineP::Server
         @attrs ||= DEFAULT_FILE_ATTRS.
           merge(qid: qid,
                 mode: (PermMode::FILE | ((@writeable ? MODE_WRITEABLE : MODE_READABLE) & ~umask)))
+      end
+
+      def setattr attrs
+        raise Errno::ENOTSUP unless @writeable
+        @attrs = @attrs.merge(attrs) # todo be picky
+        self
       end
     end
     
@@ -307,6 +321,10 @@ module NineP::Server
           merge(qid: qid,
                 mode: PermMode::FILE | ((data.frozen? ? MODE_READABLE : MODE_WRITEABLE) & ~umask))
       end
+
+      def setattr attrs
+        @attrs = @attrs.merge(attrs) # todo be picky
+      end
     end
     
     # An entry that has dynamically generated contents that buffers writes for an updating callback.
@@ -346,7 +364,7 @@ module NineP::Server
                           [ name,
                             case data
                             when Entry then data
-                            when String then BufferEntry.new(name, data, umask: umask)
+                            when String then (data.frozen? ? StaticEntry : BufferEntry).new(name, data, umask: umask)
                             when Pathname then FileEntry.new(name, path: data, umask: umask)
                             when Hash then DirectoryEntry.new(name, entries: data, umask: umask)
                             else StaticEntry.new(name, data, umask: umask)
@@ -424,9 +442,16 @@ module NineP::Server
         @backend = nil
         self
       end
+
+      def create name, flags, mode, gid
+        @open_flags = flags
+        @backend&.close
+        @backend = @entry.create(name, flags, mode, gid)
+        self
+      end
       
       delegate :truncate, :read, :write, :readdir, to: :backend
-      delegate :size, :getattr, to: :entry
+      delegate :size, :getattr, :setattr, to: :entry
     end
 
     attr_reader :root
@@ -458,6 +483,13 @@ module NineP::Server
       self
     end
 
+    def create fsid, name, flags, mode, gid
+      id_data = @fsids.fetch(fsid)
+      id_data.create(name, flags, mode, gid)
+    rescue KeyError
+      raise Errno::EBADFD
+    end
+    
     def next_id
       @next_id += 1
     end
@@ -470,7 +502,11 @@ module NineP::Server
       i = next_id
       NineP.vputs { "Walking #{i} to #{path} #{old_fsid}" }
       steps, entry = find_entry(path, old_fsid != nil && old_fsid != 0 ? @fsids.fetch(old_fsid).entry : nil)
-      @fsids[i] = FSID.new(entry.name, entry || steps.last)
+      @fsids[i] = if entry
+                    FSID.new(entry.name, entry)
+                  else
+                    FSID.new(steps.last&.name || '/', steps.last || root)
+                  end
       [ steps.collect(&:qid), i ]
     end
 
@@ -517,9 +553,21 @@ module NineP::Server
     end
 
     def getattr fsid
+      NineP.vputs { "GetAttr #{fsid} #{@fsids[fsid].inspect}" }
       @fsids.fetch(fsid).getattr
     rescue KeyError
-      raise Errno::ENOENT
+      if fsid == 0
+        root.getattr
+      else
+        raise Errno::EBADFD
+      end
+    end
+
+    def setattr fsid, attrs
+      NineP.vputs { "SetAttr #{fsid} #{@fsids[fsid].inspect}" }
+      @fsids.fetch(fsid).setattr(attrs)
+    rescue KeyError
+      raise Errno::EBADFD
     end
   end
 end

@@ -28,6 +28,10 @@ module NineP::Server
       self
     end
 
+    def create fsid, name, flags, wode, gid
+      raise Errno::ENOTSUP
+    end
+    
     def walk path, old_fsid = nil
       raise Errno::ENOTSUP
     end
@@ -45,6 +49,10 @@ module NineP::Server
     end
 
     def getattr fsid
+      raise Errno::ENOTSUP
+    end
+
+    def getattr fsid, attrs
       raise Errno::ENOTSUP
     end
   end

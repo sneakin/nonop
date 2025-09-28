@@ -5,6 +5,7 @@ require_relative 'packet-data'
 require_relative '../qid'
 
 module NineP
+  # todo 9p2000.u packet
   class Tcreate
     include Packet::Data
     define_packing([:fid, :uint32l],

@@ -104,7 +104,7 @@ ctlfs = NineP::Server::HashFileSystem.
           'stats' => lambda { format_server_stats(srvenv.stats) },
         },
         'config' => {
-          'README' => "Configure the server by writing to these files.\n",
+          'README' => "Configure the server by writing to these files.\n".freeze,
           'verbose' => NineP::Server::HashFileSystem::WriteableEntry.new('verbose') { |entry, data = nil, offset = 0|
             if data
               $verbose = entry.data.strip.to_bool

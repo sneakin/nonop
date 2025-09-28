@@ -29,6 +29,10 @@ module NineP::Server
     def open flags
       @fs.open(@fsid, flags)
     end
+
+    def create name, flags, mode, gid
+      @fs.create(@fsid, name, flags, mode, gid)
+    end
     
     def readdir count, offset = 0
       @fs.readdir(@fsid, count, offset)
@@ -48,6 +52,23 @@ module NineP::Server
 
     def getattr mask
       @fs.getattr(@fsid)
+    end
+
+    def setattr_bit data, bit, field
+      return data[field] if 0 != (data.valid & NineP::L2000::Tsetattr::Bits[bit])
+    end
+    
+    def setattr attrs
+      @fs.setattr(@fsid, {
+                    mode: setattr_bit(attrs, :MODE, :mode),
+                    uid: setattr_bit(attrs, :UID, :uid),
+                    gid: setattr_bit(attrs, :GID, :gid),
+                    size: setattr_bit(attrs, :SIZE, :size),
+                    atime_sec: setattr_bit(attrs, :ATIME_SET, :atime_sec),
+                    atime_nsec: setattr_bit(attrs, :ATIME_SET, :atime_nsec),
+                    mtime_sec: setattr_bit(attrs, :MTIME_SET, :mtime_sec),
+                    mtime_nsec: setattr_bit(attrs, :MTIME_SET, :mtime_nsec),
+                  }.reject { _2.nil? }.tap { NineP.vputs(_1.inspect) })
     end
   end
 end

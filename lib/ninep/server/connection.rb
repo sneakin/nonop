@@ -55,8 +55,10 @@ module NineP::Server
       NineP::Tclunk => :on_clunk,
       NineP::Twalk => :on_walk,
       NineP::L2000::Topen => :on_open,
+      NineP::L2000::Tcreate => :on_create,
       NineP::L2000::Treaddir => :on_readdir,
       NineP::L2000::Tgetattr => :on_getattr,
+      NineP::L2000::Tsetattr => :on_setattr,
     }
     
     def handle
@@ -178,7 +180,7 @@ module NineP::Server
 
     def on_open pkt
       stream = @open_fids.fetch(pkt.data.fid)
-      NineP.vputs { "Opening #{pkt.data.fid} #{stream.qid.inspect} #{stream.inspect}" }
+      NineP.vputs { "Opening #{pkt.data.fid} #{stream.qid.inspect}" }
       begin
         stream.open(pkt.data.flags)
         reply_to(pkt, NineP::Ropen.new(qid: stream.qid || stream.fs.qid,
@@ -190,6 +192,20 @@ module NineP::Server
       end
     end
 
+    def on_create pkt
+      stream = @open_fids.fetch(pkt.data.fid)
+      NineP.vputs { "Creating #{pkt.data.fid} #{stream.qid.inspect}" }
+      begin
+        stream.create(pkt.data.name, pkt.data.flags, pkt.data.mode, pkt.data.gid)
+        reply_to(pkt, NineP::Rcreate.new(qid: stream.qid || stream.fs.qid,
+                                         iounit: 0))
+      rescue KeyError
+        reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
+      rescue SystemCallError
+        reply_to(pkt, NineP::L2000::Rerror.new($!))
+      end
+    end
+    
     QidDirentMap = {
       DIR: :DIR,
       APPEND: :REG,
@@ -231,6 +247,18 @@ module NineP::Server
       stats = stream.getattr(pkt.data.request_mask)
       NineP.vputs { "   #{stats.inspect}" }
       reply_to(pkt, NineP::L2000::Rgetattr.new(**stats))
+    rescue KeyError
+      reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
+    rescue SystemCallError
+      reply_to(pkt, NineP::L2000::Rerror.new($!))
+    end
+
+    def on_setattr pkt
+      stream = @open_fids.fetch(pkt.data.fid)
+      NineP.vputs { "Setattr #{pkt.data.fid}" }
+      stats = stream.setattr(pkt.data)
+      NineP.vputs { "   #{stats.inspect}" }
+      reply_to(pkt, NineP::L2000::Rsetattr.new())
     rescue KeyError
       reply_to(pkt, NineP::L2000::Rerror.new(Errno::EBADFD))
     rescue SystemCallError

@@ -70,7 +70,7 @@ module NineP
       def btime_sec= t
         key = Integer === t ? :n : :t
         @btime_sec = TimeT.new(key => t)
-      end
+      end      
     end
   end
 end
