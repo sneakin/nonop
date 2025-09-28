@@ -41,7 +41,7 @@ require_relative 'messages/2000L/rename'
 module NineP
   class Decoder
     VERSION = '9P2000'
-    
+
     MIN_MSGLEN = 128
     MAX_MSGLEN = 65535
 
@@ -66,16 +66,16 @@ module NineP
     class DecodeError < NineP::Error
       include SG::AttrStruct
       attributes :size, :packet, :extra
-      
+
       def message
         "Decode error: read #{size} bytes, #{packet.class} left #{extra&.bytesize || 0} bytes."
       end
     end
-    
+
     class InvalidSize < RuntimeError
       include SG::AttrStruct
       attributes :size, :max_msglen
-      
+
       def message
         "Decode error: #{size || '---'} is not between 0 and #{max_msglen || '---'}"
       end
@@ -83,7 +83,7 @@ module NineP
 
     attr_reader :version, :packet_types, :packet_types_inv
     attr_accessor :max_msglen
-    
+
     def initialize coders: nil, version: nil, max_msglen: nil
       raise ArgumentError.new("max_msglen must be > #{MIN_MSGLEN}") if max_msglen && max_msglen <= MIN_MSGLEN
       @version = version || VERSION
@@ -96,7 +96,7 @@ module NineP
     def max_datalen
       max_msglen - MIN_MSGLEN # Packet.attribute_offset(:raw_data)
     end
-    
+
     class NopDecoder
       def self.unpack str
         [ nil, str ]
@@ -110,7 +110,7 @@ module NineP
       NineP.vputs { "   %s %i %s" % [ pkt.coder, data.size, data.inspect ] }
       io.write(data)
     end
-    
+
     def read_one io
       # todo any real need for Packet? Which of these is faster?
       pkt, more = begin
@@ -139,13 +139,13 @@ module NineP
       pkt.coder = packet_types[pkt.type]
       [ pkt, more ]
     end
-    
+
     def add_packet_type id, packer
       packet_types[id] = packer
       packet_types_inv[packer] = id
       self
     end
-    
+
     def add_packet_types types
       types.each do
         case _1
@@ -165,7 +165,7 @@ module NineP
   module L2000
     class Decoder < NineP::Decoder
       VERSION = '9P2000.L'
-      
+
       RequestReplies = {
         7 => L2000::Rerror,
         8 => Tstatfs, 9 => Rstatfs,

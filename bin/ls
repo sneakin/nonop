@@ -112,7 +112,7 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, 
 
       new_max_name = 2 + new_max_name
       max_name = new_max_name if max_name < new_max_name
-      
+
       ents = if sort_field == :name
                ents.sort_by { _1[0].name }
              elsif sort_field
@@ -157,7 +157,7 @@ client.start do |pkt|
       end
     end
   end
-  
+
   if uid && auth_creds != false
     auth_creds ||= Munge.encode(uid: uid)
     client.auth(uname: uname,

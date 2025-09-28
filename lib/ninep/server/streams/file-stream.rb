@@ -6,7 +6,7 @@ require_relative '../stream'
 module NineP::Server
   class FileStream < Stream
     attr_reader :fs, :fid, :qids, :fsid
-    
+
     def initialize fs, fid, qids, fsid
       @fs = fs
       @fid = fid
@@ -33,7 +33,7 @@ module NineP::Server
     def create name, flags, mode, gid
       @fs.create(@fsid, name, flags, mode, gid)
     end
-    
+
     def readdir count, offset = 0
       @fs.readdir(@fsid, count, offset)
     end
@@ -54,21 +54,37 @@ module NineP::Server
       @fs.getattr(@fsid)
     end
 
-    def setattr_bit data, bit, field
-      return data[field] if 0 != (data.valid & NineP::L2000::Tsetattr::Bits[bit])
-    end
-    
     def setattr attrs
-      @fs.setattr(@fsid, {
-                    mode: setattr_bit(attrs, :MODE, :mode),
-                    uid: setattr_bit(attrs, :UID, :uid),
-                    gid: setattr_bit(attrs, :GID, :gid),
-                    size: setattr_bit(attrs, :SIZE, :size),
-                    atime_sec: setattr_bit(attrs, :ATIME_SET, :atime_sec),
-                    atime_nsec: setattr_bit(attrs, :ATIME_SET, :atime_nsec),
-                    mtime_sec: setattr_bit(attrs, :MTIME_SET, :mtime_sec),
-                    mtime_nsec: setattr_bit(attrs, :MTIME_SET, :mtime_nsec),
+        @fs.setattr(@fsid, {
+                    mode: setattr_field(attrs, :MODE, :mode),
+                    uid: setattr_field(attrs, :UID, :uid),
+                    gid: setattr_field(attrs, :GID, :gid),
+                    size: setattr_field(attrs, :SIZE, :size),
+                    atime_sec: setattr_time(attrs, :ATIME, :ATIME_SET, :atime_sec),
+                    atime_nsec: setattr_nsec(attrs, :ATIME, :ATIME_SET, :atime_nsec),
+                    mtime_sec: setattr_time(attrs, :MTIME, :MTIME_SET, :mtime_sec),
+                    mtime_nsec: setattr_nsec(attrs, :MTIME, :MTIME_SET, :mtime_nsec),
                   }.reject { _2.nil? }.tap { NineP.vputs(_1.inspect) })
+    end
+
+    private
+
+    def setattr_value data, bit, value
+      return value if 0 != (data.valid & NineP::L2000::Tsetattr::Bits[bit])
+    end
+
+    def setattr_field data, bit, field
+      setattr_value(data, bit, data[field])
+    end
+
+    def setattr_time data, now_bit, set_bit, field
+      setattr_value(data, now_bit,
+                    0 == (data.valid & NineP::L2000::Tsetattr::Bits[set_bit]) ? Time.now : data[field])
+    end
+
+    def setattr_nsec data, now_bit, set_bit, field
+      setattr_value(data, now_bit,
+                    0 == (data.valid & NineP::L2000::Tsetattr::Bits[set_bit]) ? Time.now.nsec : data[field])
     end
   end
 end

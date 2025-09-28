@@ -23,7 +23,7 @@ module NineP
     else pkt
     end
   end
-  
+
   class Rerror
     include ErrorPayload
     include Packet::Data

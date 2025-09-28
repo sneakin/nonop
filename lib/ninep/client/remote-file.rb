@@ -9,7 +9,7 @@ require_relative 'remote-io'
 module NineP
   class RemoteFile
     attr_reader :attachment, :path, :flags, :io
-    
+
     def initialize path, attachment:, flags: nil, fid: nil, mode: nil, gid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
@@ -80,7 +80,7 @@ module NineP
         end
       end
     end
-    
+
     def close &blk
       @io.close(&blk)
       @ready = false
@@ -98,12 +98,12 @@ module NineP
       r = @io.write(data, offset:, length:, &blk)
       retself(r, @io)
     end
-    
+
     def write_one data, offset: 0, &blk
       r = @io.write_one(data, offset:, &blk)
       retself(r, @io)
     end
-    
+
     def wrap_error_or_data pkt, error = Error
       case pkt
       when ErrorPayload then error.new(pkt, path)

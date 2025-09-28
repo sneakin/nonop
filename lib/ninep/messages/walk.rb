@@ -13,7 +13,7 @@ module NineP
                    [:newfid, :uint32l],
                    [:nwnames, :uint16l],
                    [:wnames, NString, :nwnames])
-    
+
     def pack
       self.nwnames = wnames.size
       super
@@ -25,7 +25,7 @@ module NineP
     include Packet::Data
     define_packing([:nwqid, :uint16l],
                    [:wqid, Qid, :nwqid])
-    
+
     def pack
       self.nwqid = wqid.size
       super

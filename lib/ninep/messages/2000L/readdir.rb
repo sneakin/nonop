@@ -41,7 +41,7 @@ module NineP
       define_packing([:count, :uint32l],
                      [:data, :string, :count])
       attributes :entries
-      
+
       def unpack_entries
         ents = []
         d = data
@@ -55,7 +55,7 @@ module NineP
       def entries
         @entries ||= unpack_entries
       end
-      
+
       def pack
         self.data = entries.collect(&:pack).join
         self.count = self.data.bytesize

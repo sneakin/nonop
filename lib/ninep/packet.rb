@@ -13,11 +13,11 @@ module NineP
                    [:raw_data, :string, :data_size])
     calc_attr :size, lambda { attribute_offset(:raw_data) + data.bytesize }
     attributes :coder, :data, :extra_data
-    
+
     def coder
       @coder || data&.class
     end
-    
+
     def pack
       if @data
         @raw_data = @data.pack
@@ -25,7 +25,7 @@ module NineP
       end
       super
     end
-    
+
     def data_size
       size - attribute_offset(:raw_data)
     end

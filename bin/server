@@ -113,7 +113,7 @@ ctlfs = NineP::Server::HashFileSystem.
           },
           'done' => NineP::Server::HashFileSystem::WriteableEntry.new('done') { |entry, data = nil, offset = 0|
             if data && entry.data.strip.to_bool
-              srvenv.done! { reactor.done! } 
+              srvenv.done! { reactor.done! }
             end
             entry.data || reactor.done?.to_s + "\n"
           }

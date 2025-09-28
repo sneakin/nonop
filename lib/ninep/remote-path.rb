@@ -5,7 +5,7 @@ module NineP
   class RemotePath
     Separator = '/'.freeze
     attr_reader :parts, :separator
-    
+
     def initialize path, separator: nil
       @separator = separator || Separator
       @parts = case path
@@ -28,15 +28,15 @@ module NineP
     alias to_s to_str
 
     include Enumerable
-    
+
     def each &blk
       parts.each(&blk)
     end
-    
+
     def basename
       parts.last
     end
-    
+
     def parent levels = nil, from_top: false
       if from_top
         self.class.new(parts[0, levels || (parts.size - 1)],

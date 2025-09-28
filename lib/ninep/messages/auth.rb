@@ -12,7 +12,7 @@ module NineP
                    [:uname, NString],
                    [:aname, NString])
   end
-  
+
   class Rauth
     include Packet::Data
     define_packing([:aqid, Qid])

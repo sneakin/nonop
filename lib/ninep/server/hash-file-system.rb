@@ -10,7 +10,7 @@ module NineP::Server
     MODE_WRITEABLE = 0664
     MODE_READABLE = 0444
     MODE_EXECUTABLE = 0775
-    
+
     DEFAULT_DIR_ATTRS = {
       valid: 0xFFFF, # mask of set fields
       mode: PermMode::DIR | MODE_EXECUTABLE,
@@ -48,14 +48,14 @@ module NineP::Server
           @data&.close
           @mode = @data = nil
         end
-        
+
         delegate :truncate, :read, :write, :readdir, to: :data
 
         def writeable?
           (nil != @mode) &&
             ((0 != ((@mode || 0) & (NineP::L2000::Topen::Flags[:WRONLY] | NineP::L2000::Topen::Flags[:RDWR]))))
         end
-        
+
         def readable?
           (nil != @mode) &&
             ((0 == (@mode || 0) & NineP::L2000::Topen::Mask[:MODE]) ||
@@ -68,11 +68,11 @@ module NineP::Server
         def open mode
           self
         end
-        
+
         def close
           self
         end
-        
+
         def truncate size = 0
           raise Errno::ENOTSUP
         end
@@ -85,14 +85,14 @@ module NineP::Server
           raise Errno::ENOTSUP
         end
       end
-      
+
       attr_reader :name, :umask
-      
+
       def initialize name, umask: nil
         @name = name
         @umask = umask || File.umask
       end
-      
+
       def qid
         @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:FILE],
                                 version: 0,
@@ -106,7 +106,7 @@ module NineP::Server
       def open p9_mode, data = nil
         OpenedEntry.new(self, p9_mode, data || DataProvider.new)
       end
-      
+
       def close
         self
       end
@@ -114,13 +114,13 @@ module NineP::Server
       def create name, flags, mode, gid
         raise Errno::ENOTSUP
       end
-      
+
       def attrs
         @attrs ||= DEFAULT_FILE_ATTRS.
           merge(qid: qid,
                 mode: PermMode::FILE | MODE_READABLE & ~umask)
       end
-      
+
       def getattr
         attrs.merge(size: size, blocks: size / BLOCK_SIZE)
       end
@@ -134,11 +134,11 @@ module NineP::Server
     class StaticEntry < Entry
       class DataProvider < Entry::DataProvider
         attr_reader :entry
-        
+
         def initialize entry
           @entry = entry
         end
-        
+
         def read count, offset = 0
           entry.attrs[:atime_sec] = Time.now
           entry.data[offset, count]
@@ -155,7 +155,7 @@ module NineP::Server
         raise Errno::ENOTSUP if ret.writeable?
         ret
       end
-      
+
       def size
         data.bytesize
       end
@@ -175,17 +175,17 @@ module NineP::Server
       # an independent IO.
       class DataProvider < Entry::DataProvider
         attr_reader :entry
-        
+
         def initialize entry, writeable = false
           @entry = entry
           @writeable = writeable
         end
 
         delegate :path, to: :entry
-        
+
         def open p9_mode = nil
           return self if @io
-          
+
           raise Errno::ENOTSUP if (!@writeable && (0 != (p9_mode & NineP::L2000::Topen::Mask[:MODE])))
           raise Errno::ENOTSUP if (0 != (p9_mode & NineP::L2000::Topen::Flags[:DIRECTORY]))
           raise Errno::ENOENT if @writeable && (0 == (p9_mode & NineP::L2000::Topen::Flags[:CREATE])) && !path.exist?
@@ -232,13 +232,13 @@ module NineP::Server
       # todo Purely IO backed entries: open & close pose problems
 
       attr_reader :path
-      
+
       def initialize name, path: nil, writeable: nil, umask: nil
         super(name, umask:)
         @path = (path == nil || Pathname === path) ? path : Pathname.new(path)
         @writeable = writeable
       end
-      
+
       def size
         if path
           path.stat.size
@@ -265,7 +265,7 @@ module NineP::Server
         self
       end
     end
-    
+
     class BufferEntry < Entry
       class DataProvider < Entry::DataProvider
         attr_reader :entry
@@ -277,12 +277,12 @@ module NineP::Server
       end
 
       attr_accessor :data
-      
+
       def initialize name, data, umask: nil
         super(name, umask:)
         @data = data
       end
-      
+
       def size
         data.bytesize
       end
@@ -293,7 +293,7 @@ module NineP::Server
           oe.truncate
         end
         oe
-      end        
+      end
 
       def read count, offset = 0
         attrs[:atime_sec] = Time.now
@@ -326,7 +326,7 @@ module NineP::Server
         @attrs = @attrs.merge(attrs) # todo be picky
       end
     end
-    
+
     # An entry that has dynamically generated contents that buffers writes for an updating callback.
     class WriteableEntry < BufferEntry
       def initialize name, umask: nil, &blk
@@ -344,11 +344,11 @@ module NineP::Server
     class DirectoryEntry < Entry
       class DataProvider < Entry::DataProvider
         attr_reader :entry
-        
+
         def initialize entry
           @entry = entry
         end
-        
+
         def readdir count, offset = 0
           entry.attrs[:atime_sec] = Time.now
           entry.readdir(count, offset)
@@ -356,7 +356,7 @@ module NineP::Server
       end
 
       attr_reader :entries
-      
+
       def initialize name, umask: nil, entries:, root: false
         super(name, umask:)
         @is_root = root
@@ -375,7 +375,7 @@ module NineP::Server
       def is_root?
         !!@is_root
       end
-      
+
       def qid
         @qid ||= NineP::Qid.new(type: is_root? ? NineP::Qid::Types[:MOUNT] : NineP::Qid::Types[:DIR],
                                 version: 0,
@@ -385,7 +385,7 @@ module NineP::Server
       def open p9_mode
         super(p9_mode, DataProvider.new(self))
       end
-      
+
       def size
         entries.size
       end
@@ -402,11 +402,11 @@ module NineP::Server
                 blocks: @entries.size / BLOCK_SIZE)
       end
     end
-    
+
     # Provides the operations for ~fsid~ numbers to reference an OpenedEntry.
     class FSID
       attr_accessor :path, :entry, :backend, :open_flags
-      
+
       def initialize path, entry, open_flags: nil, backend: nil
         @path = path
         @entry = entry
@@ -417,7 +417,7 @@ module NineP::Server
       def dup
         self.class.new(path, entry, open_flags:, backend: backend.dup)
       end
-      
+
       def reading?
         m = @open_flags & NineP::L2000::Topen::Mask[:MODE]
         m == NineP::L2000::Topen::Flags[:RDONLY] ||
@@ -449,20 +449,20 @@ module NineP::Server
         @backend = @entry.create(name, flags, mode, gid)
         self
       end
-      
+
       delegate :truncate, :read, :write, :readdir, to: :backend
       delegate :size, :getattr, :setattr, to: :entry
     end
 
     attr_reader :root
     delegate :qid, :entries, to: :root
-    
+
     def initialize entries: nil, umask: nil
       @root = DirectoryEntry.new('/', entries: entries, umask: umask, root: true)
       @next_id = 0
       @fsids = {}
     end
-    
+
     def qid_for path
       steps, entry = find_entry(path)
       raise KeyError.new("#{path} not found") unless entry
@@ -476,7 +476,7 @@ module NineP::Server
     rescue KeyError
       raise Errno::EBADFD
     end
-    
+
     def close fsid
       id_data = @fsids.delete(fsid)
       id_data&.close
@@ -489,7 +489,7 @@ module NineP::Server
     rescue KeyError
       raise Errno::EBADFD
     end
-    
+
     def next_id
       @next_id += 1
     end
@@ -497,7 +497,7 @@ module NineP::Server
     def fsid_path fsid
       @fsids.fetch(fsid).path
     end
-    
+
     def walk path, old_fsid = nil
       i = next_id
       NineP.vputs { "Walking #{i} to #{path} #{old_fsid}" }

@@ -26,7 +26,7 @@ module Munge
         else break meta
         end
         meta
-      end 
+      end
       payload = io.read
       [ meta, payload ]
     end

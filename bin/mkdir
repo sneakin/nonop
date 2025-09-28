@@ -101,7 +101,7 @@ client.start do |pkt|
       end
     end
   end
-  
+
   if uid && auth_creds != false
     auth_creds ||= Munge.encode(uid: uid)
     client.auth(uname: uname,

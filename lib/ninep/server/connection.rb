@@ -7,7 +7,7 @@ require_relative '../decoder'
 module NineP::Server
   class Connection
     attr_reader :io, :coder, :input, :output, :environment
-    
+
     def initialize io, env
       @io = io
       @environment = env
@@ -23,7 +23,7 @@ module NineP::Server
                          @io.remote_address.ip_address,
                          @io.remote_address.ip_port ]
     end
-    
+
     def close
       return if closed?
       NineP.vputs { "Closing #{self}" }
@@ -60,7 +60,7 @@ module NineP::Server
       NineP::L2000::Tgetattr => :on_getattr,
       NineP::L2000::Tsetattr => :on_setattr,
     }
-    
+
     def handle
       pkt = coder.read_one(@io)
       handler = Handlers.fetch(pkt.data.class, :on_unknown)
@@ -205,7 +205,7 @@ module NineP::Server
         reply_to(pkt, NineP::L2000::Rerror.new($!))
       end
     end
-    
+
     QidDirentMap = {
       DIR: :DIR,
       APPEND: :REG,
@@ -220,7 +220,7 @@ module NineP::Server
       h[NineP::Qid::Types[k]] = NineP::L2000::DirentTypes[v]
       h
     end
-    
+
     def map_qid_to_dirent_type qid
       QidDirentMap.fetch(qid.type)
     end

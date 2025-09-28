@@ -94,7 +94,7 @@ client.start do |pkt|
   if block_size >= pkt.msize
     block_size = pkt.msize - NineP::Decoder::MIN_MSGLEN
   end
-  
+
   main_loop = lambda do |*a|
     client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
       raise attachment if StandardError === attachment
@@ -109,7 +109,7 @@ client.start do |pkt|
 
       attachment.open(paths[0], gid: gid, flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
         raise file if StandardError === file
-        
+
         doner = lambda do |*state|
           NineP.vputs("ALL DONE")
           client.close
@@ -124,7 +124,7 @@ client.start do |pkt|
               if data_block.bytesize < block_size
                 file.close
               end
-              
+
               cc.call(data_block.bytesize < block_size,
                       count + reply,
                       offset + reply, &doner)

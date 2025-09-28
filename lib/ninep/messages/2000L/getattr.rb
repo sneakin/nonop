@@ -26,7 +26,7 @@ module NineP
         GEN:          0x00001000,
         DATA_VERSION: 0x00002000,
       }
-      
+
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:request_mask, :uint64l])
@@ -70,7 +70,7 @@ module NineP
       def btime_sec= t
         key = Integer === t ? :n : :t
         @btime_sec = TimeT.new(key => t)
-      end      
+      end
     end
   end
 end

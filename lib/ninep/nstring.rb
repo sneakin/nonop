@@ -22,7 +22,7 @@ module NineP
       end
       @value ||= "\x00" * @size
     end
-        
+
     def to_s
       value
     end

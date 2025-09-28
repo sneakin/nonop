@@ -5,7 +5,7 @@ module NineP::Server
   class Environment
     attr_reader :authsrv, :auth_qid
     attr_reader :exports, :connections
-    
+
     def initialize authsrv: nil
       @authsrv = authsrv
       @exports = {}
@@ -34,7 +34,7 @@ module NineP::Server
       @connections.delete(conn)
       self
     end
-    
+
     def stats
       { exports: exports.size,
         connections: connections.size,

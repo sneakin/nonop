@@ -7,7 +7,7 @@ require_relative 'client/attachment'
 module NineP
   class Client
     attr_reader :coder, :io, :buffer_size, :server_info, :afid
-    
+
     def initialize coder:, io:
       @coder = coder
       @io = io
@@ -18,7 +18,7 @@ module NineP
       @open_fids = []
       @free_fids = []
     end
-    
+
     def read_one
       @coder.read_one(@io)
     end
@@ -81,11 +81,11 @@ module NineP
       @free_fids.push(fid)
       self
     end
-    
+
     def next_tag
       @next_tag = (@next_tag + 1) & 0xFFFF
     end
-    
+
     def request msg, wait_for: false, &handler
       tag = next_tag
       add_handler(tag, handler) if handler
@@ -97,11 +97,11 @@ module NineP
         return pkt
       end
     end
-    
+
     def flush
       @io.flush
     end
-   
+
     def close
       close_fids
       @io.close
@@ -112,7 +112,7 @@ module NineP
       @open_fids.clear
       self
     end
-    
+
     def closed?
       @io.closed?
     end
@@ -152,7 +152,7 @@ module NineP
       # The supplied block should make the second attachment.
       send_auth(uname:, aname:, n_uname:) do |io, &cc|
         raise io if StandardError === io
-        
+
         auth_cc = lambda do |reply = nil, &cc|
           auth_attach(uname: '', aname:, n_uname:) do |attachment|
             raise attachment if StandardError === attachment
@@ -169,7 +169,7 @@ module NineP
         end
       end
     end
-    
+
     def send_auth uname:, n_uname:, aname:, &blk
       NineP.vputs { "Authenticating #{n_uname}" }
       auth_fid = 0

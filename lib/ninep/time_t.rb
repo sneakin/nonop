@@ -23,7 +23,7 @@ module NineP
       @n = v&.to_i
       @t = v
     end
-    
+
     delegate :to_i, :to_s, to: :n
     delegate :strftime, to: :t
 
@@ -33,6 +33,6 @@ module NineP
 
     def self.now
       self.new(t: Time.now)
-    end        
+    end
   end
 end

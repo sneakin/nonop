@@ -16,7 +16,7 @@ module NineP
       LINK: 0x01,
       FILE: 0x00,
     }
-    
+
     include SG::AttrStruct
     include SG::PackedStruct
     define_packing([:type, :uint8],

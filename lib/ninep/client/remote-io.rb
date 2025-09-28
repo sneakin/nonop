@@ -8,7 +8,7 @@ require_relative '../remote-path'
 module NineP
   class RemoteIO
     attr_reader :client, :fid, :path
-    
+
     def initialize client, fid, path
       @client = client
       @fid = fid
@@ -25,7 +25,7 @@ module NineP
     def read length, offset: 0, &blk
       raise ArgumentError.new("Length %i must be 1...%i" % [ length, client.max_datalen ]) unless (1..client.max_datalen) === length
       raise ArgumentError.new("Offset must be positive") if offset < 0
-      
+
       req = client.request(NineP::Tread.new(fid: fid,
                                             offset: offset,
                                             count: length),
@@ -66,7 +66,7 @@ module NineP
           end
         end
       end
-      
+
       if blk
         self
       else
@@ -74,7 +74,7 @@ module NineP
         return results[0]
       end
     end
-    
+
     def write_one data, offset: 0, &blk
       raise ArgumentError.new("Length %i must be 1...%i" % [ data.bytesize, client.max_datalen ]) unless (1..client.max_datalen) === data.bytesize
       raise ArgumentError.new("Offset must be positive") if offset < 0
@@ -83,7 +83,7 @@ module NineP
                      wait_for: blk == nil) do |result|
         blk&.call(NineP.maybe_wrap_error(result, WriteError))
       end
-      
+
       if blk
         self
       else
@@ -94,7 +94,7 @@ module NineP
         end
       end
     end
-    
+
     def wrap_error_or_data pkt, error = Error
       case pkt
       when ErrorPayload then error.new(pkt, path)

@@ -8,9 +8,9 @@ require_relative '../remote-path'
 module NineP
   class RemoteDir
     READ_SIZE = 4096
-    
+
     attr_reader :path, :attachment, :flags, :fid
-    
+
     def initialize path, attachment:, flags: nil, fid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
@@ -30,7 +30,7 @@ module NineP
     def ready?
       @ready
     end
-    
+
     def close
       client.clunk(fid) do |reply|
         raise reply if StandardError === reply
@@ -43,7 +43,7 @@ module NineP
     # todo an async version to complement an enumerable; needs to pass a continuation to ~blk~
     def entries count: nil, offset: nil, wait_for: true, &blk
       return to_enum(__method__, count:, offset:, wait_for: true) unless blk
-      
+
       count ||= READ_SIZE
 
       Async.reduce(0.upto(MAX_U64), offset || 0) do |n, offset, &cc|
@@ -86,11 +86,11 @@ module NineP
     def getattr entry, &blk
       attachment.getattr(entry, fid: fid, &blk)
     end
-    
+
     def stat entry, &blk
       attachment.stat(entry, &blk)
     end
-    
+
     def walk_to_self &blk
       attachment.walk(@path, nfid: @fid) do |pkt|
         case pkt
@@ -105,10 +105,10 @@ module NineP
         end
       end
     end
-    
+
     def open_self &blk
       return blk.call(self) if ready?
-      
+
       walk_to_self do |pkt|
         case pkt
         when Rwalk then

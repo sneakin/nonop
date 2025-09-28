@@ -36,7 +36,7 @@ module NineP
     def nil?
       true
     end
-    
+
     def <=> other
       other == nil ? 0 : 1
     end

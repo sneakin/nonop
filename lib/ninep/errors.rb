@@ -4,7 +4,7 @@ module NineP
 
   class NotReady < RuntimeError
   end
-    
+
   class ProtocolError < Error
     def initialize err, msg = nil
       sys = SystemCallError.new(msg, Integer === err ? err : err.code)

@@ -6,7 +6,7 @@ require_relative '../stream'
 module NineP::Server
   class AttachStream < Stream
     attr_reader :fs
-    
+
     def initialize fs, fid
       @fs = fs
       @fid = fid
