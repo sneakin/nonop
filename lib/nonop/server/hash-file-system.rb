@@ -276,7 +276,7 @@ module NonoP::Server
                 mode: PermMode::FILE | ((data.frozen? ? PermMode::R : PermMode::RW) & ~umask))
       end
 
-      # @param attrs [Hash<Symbol, Object>]
+      # @param new_attrs [Hash<Symbol, Object>]
       # @return [self]
       def setattr new_attrs
         @attrs = attrs.merge(new_attrs) # todo be picky
