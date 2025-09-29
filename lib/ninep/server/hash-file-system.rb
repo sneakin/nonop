@@ -422,7 +422,7 @@ module NineP::Server
       attr_accessor :path
       # @return [Entry]
       attr_accessor :entry
-      # @return [Entry::OpenedEntry, nil]
+      # @return [OpenedEntry, nil]
       attr_accessor :backend
       # @return [Integer, nil]
       attr_accessor :open_flags
@@ -430,7 +430,7 @@ module NineP::Server
       # @param path [RemotePath]
       # @param entry [Entry]
       # @param open_flags [Integer, nil]
-      # @param backend [Entry::OpenedEntry, nil]
+      # @param backend [OpenedEntry, nil]
       def initialize path, entry, open_flags: nil, backend: nil
         @path = path
         @entry = entry

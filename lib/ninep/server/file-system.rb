@@ -171,12 +171,12 @@ module NineP::Server
       attr_reader :entry
       # @return [Integer]
       attr_reader :mode
-      # @return [DataProvider]
+      # @return [Entry::DataProvider]
       attr_reader :data
 
       # @param entry [Entry]
       # @param mode [Integer]
-      # @param data [DataProvider]
+      # @param data [Entry::DataProvider]
       def initialize entry, mode, data
         @entry = entry
         @mode = mode
