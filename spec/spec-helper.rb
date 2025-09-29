@@ -1,16 +1,16 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'ninep/util'
+require 'nonop/util'
 
 $verbose = ENV['VERBOSE'].to_bool
 
-module NineP::SpecHelper
-  NINEP_PATH = 'bin/ninep'
+module NonoP::SpecHelper
+  NONOP_PATH = 'bin/nonop'
   
-  def run_ninep *args, mode: nil, &blk
+  def run_nonop *args, mode: nil, &blk
     blk ||= /^w/ === mode ? lambda { |_| true } : lambda { _1.read }
-    data = IO.popen([ 'bundle', 'exec', NINEP_PATH, *args],
+    data = IO.popen([ 'bundle', 'exec', NONOP_PATH, *args],
                     mode || 'r',
                     &blk)
     @status = $?
@@ -18,7 +18,7 @@ module NineP::SpecHelper
   end
 
   def start_server *args
-    pid = Process.spawn('bundle', 'exec', NINEP_PATH, 'server', '--port', '10000', '--auth-provider', 'yes', *args)
+    pid = Process.spawn('bundle', 'exec', NONOP_PATH, 'server', '--port', '10000', '--auth-provider', 'yes', *args)
     now = Time.at(Time.now.to_i + 1).strftime("%x %X") # fixme regex match? data table?
     sleep(2) # fixme need a signal of sorts
     [ pid, now ]

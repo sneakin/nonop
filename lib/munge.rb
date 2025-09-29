@@ -30,7 +30,7 @@ module Munge
       payload = io.read
       [ meta, payload ]
     end
-    NineP.vputs { [ $?.exitstatus, meta, payload ].inspect }
+    NonoP.vputs { [ $?.exitstatus, meta, payload ].inspect }
 # STATUS:          Success (0)
 # ENCODE_HOST:     semanticgap.com (127.0.0.1)
 # ENCODE_TIME:     2025-09-22 19:36:28 -0400 (1758584188)

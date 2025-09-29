@@ -5,7 +5,7 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'ninep/server'
+require 'nonop/server'
 require 'munge'
 require 'optparse'
 
@@ -76,13 +76,13 @@ end
 
 reactor = SG::IO::Reactor.new
 auth = case auth_provider
-       when 'munge' then NineP::Server::MungeAuth.new(users)
-       when 'yes' then NineP::Server::YesAuth.new(users)
+       when 'munge' then NonoP::Server::MungeAuth.new(users)
+       when 'yes' then NonoP::Server::YesAuth.new(users)
        else raise ArgumentError.new("Unknown auth provider: #{auth_provider}")
        end
-srvenv = NineP::Server::Environment.new(reactor: reactor, authsrv: auth)
+srvenv = NonoP::Server::Environment.new(reactor: reactor, authsrv: auth)
 
-fs = NineP::Server::HashFileSystem.
+fs = NonoP::Server::HashFileSystem.
   new(umask: default_umask,
       entries: {
         'abcd' => "1234\n",
@@ -93,12 +93,12 @@ srvenv.export('/', fs)
 require 'tempfile'
 scratch_file = Tempfile.new
 
-ctlfs = NineP::Server::HashFileSystem.
+ctlfs = NonoP::Server::HashFileSystem.
   new(umask: default_umask,
       entries: {
         'welcome' => "Hello!\n",
-        'scratch' => NineP::Server::HashFileSystem::FileEntry.new('scratch', path: scratch_file.path, writeable: true),
-        'tmp' => NineP::Server::HashFileSystem::DirectoryEntry.new('tmp', writeable: true),
+        'scratch' => NonoP::Server::HashFileSystem::FileEntry.new('scratch', path: scratch_file.path, writeable: true),
+        'tmp' => NonoP::Server::HashFileSystem::DirectoryEntry.new('tmp', writeable: true),
         'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
         'info' => {
           'now' => lambda { Time.now },
@@ -106,13 +106,13 @@ ctlfs = NineP::Server::HashFileSystem.
         },
         'config' => {
           'README' => "Configure the server by writing to these files.\n".freeze,
-          'verbose' => NineP::Server::HashFileSystem::WriteableEntry.new('verbose') { |entry, data = nil, offset = 0|
+          'verbose' => NonoP::Server::HashFileSystem::WriteableEntry.new('verbose') { |entry, data = nil, offset = 0|
             if data
               $verbose = entry.data.strip.to_bool
             end
             entry.data = $verbose.to_s + "\n"
           },
-          'done' => NineP::Server::HashFileSystem::WriteableEntry.new('done') { |entry, data = nil, offset = 0|
+          'done' => NonoP::Server::HashFileSystem::WriteableEntry.new('done') { |entry, data = nil, offset = 0|
             if data && entry.data.strip.to_bool
               srvenv.done! { reactor.done! }
             end
@@ -125,7 +125,7 @@ srvenv.export('ctl', ctlfs)
 listen_sock = TCPServer.new(listen_on, port)
 reactor << SG::IO::Reactor::Listener.new(listen_sock, reactor) do |client|
   puts("Accepted client #{client}")
-  conn = NineP::Server::Connection.new(client, srvenv)
+  conn = NonoP::Server::Connection.new(client, srvenv)
   [ conn.input, conn.output ]
 end
 

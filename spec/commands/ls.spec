@@ -1,7 +1,7 @@
 require_relative '../spec-helper'
 
-describe 'ninep ls' do
-  include NineP::SpecHelper
+describe 'nonop ls' do
+  include NonoP::SpecHelper
   
   describe 'on a test server' do
     before :all do
@@ -14,7 +14,7 @@ describe 'ninep ls' do
 
     describe 'with ctl aname' do
       def run_ls *args, &blk
-        run_ninep('ls', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
+        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
       end
       
       describe 'no paths' do
@@ -122,7 +122,7 @@ EOT
     
     describe 'with aname="/"' do
       def run_ls *args, &blk
-        run_ninep('ls', '--host', 'localhost', '--port', '10000', '--aname', '/', *args, &blk)
+        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', '/', *args, &blk)
       end
       
       describe 'no paths' do
@@ -141,7 +141,7 @@ EOT
   
   describe 'nonexisting server' do
     def run_ls *args
-      run_ninep('ls', '--aname', 'ctl', *args)
+      run_nonop('ls', '--aname', 'ctl', *args)
     end
 
     it 'a bad host exits w/ an error' do

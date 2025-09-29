@@ -5,7 +5,7 @@ require 'sg/ext'
 using SG::Ext
 
 require 'socket'
-require 'ninep'
+require 'nonop'
 require 'munge'
 require 'optparse'
 
@@ -60,7 +60,7 @@ opts = OptionParser.new do |o|
   end
   o.on('-s', '--sort FIELD') do |v|
     v = v.to_sym
-    fields = [ :name, *NineP::L2000::Rgetattr.members ]
+    fields = [ :name, *NonoP::L2000::Rgetattr.members ]
     if fields.include?(v)
       sort_field = v
     else
@@ -76,8 +76,8 @@ paths = opts.parse(ARGV)
 paths << '' if paths.empty?
 
 sock = TCPSocket.new(host, port)
-coder = NineP.coder_for(coder)
-client = NineP::Client.new(coder: coder, io: sock)
+coder = NonoP.coder_for(coder)
+client = NonoP::Client.new(coder: coder, io: sock)
 
 Signal.trap('INT') do
   client.close
@@ -87,7 +87,7 @@ Signal.trap('QUIT') do
 end
 
 def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, reverse_sort: false, &blk
-  NineP::Async.reduce(paths) do |path, &cc|
+  NonoP::Async.reduce(paths) do |path, &cc|
     attachment.opendir(path) do |dir|
       puts("%s:" % [ path.empty?? '/' : path.to_s ])
       if StandardError === dir
@@ -101,7 +101,7 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, 
       ents = dir.entries(wait_for: true).collect do |ent|
         new_max_name = [ new_max_name, ent.name.size ].max
         if (sort_field && sort_field != :name) || !short_list
-          stats = if attachment.client.remote_version == NineP::L2000::Decoder::VERSION
+          stats = if attachment.client.remote_version == NonoP::L2000::Decoder::VERSION
                     dir.getattr(ent.name.to_s)
                   else
                     dir.stat(ent.name.to_s)
@@ -118,7 +118,7 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, 
       ents = if sort_field == :name
                ents.sort_by { _1[0].name }
              elsif sort_field
-               ents.sort_by { NineP::Packet::Data === _1[1] ? _1[1].send(sort_field) : NineP::ComparableNil.instance }
+               ents.sort_by { NonoP::Packet::Data === _1[1] ? _1[1].send(sort_field) : NonoP::ComparableNil.instance }
              else
                ents
              end
@@ -129,7 +129,7 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, 
         if StandardError === ent_stats
           puts("  \e[1m%-*s\e[0m %s" %
                [ max_name, ent.name.to_s, ent_stats ])
-        elsif NineP::ErrorPayload === ent_stats
+        elsif NonoP::ErrorPayload === ent_stats
           puts("  \e[1m%-*s\e[0m Error: %s" %
                [ max_name, ent.name.to_s,
                  SystemCallError.new(ent.name.to_s, ent_stats.code) ])

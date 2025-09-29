@@ -1,7 +1,7 @@
 require_relative '../spec-helper'
 
-describe 'ninep put' do
-  include NineP::SpecHelper
+describe 'nonop put' do
+  include NonoP::SpecHelper
   
   describe 'on a test server' do
     before :all do
@@ -14,10 +14,10 @@ describe 'ninep put' do
 
     describe 'with ctl aname' do
       def run_cat *args, &blk
-        run_ninep('cat', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
+        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
       end
       def run_put *args, &blk
-        run_ninep('put', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, mode: 'w', &blk)
+        run_nonop('put', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, mode: 'w', &blk)
       end
 
       shared_examples_for 'happy put' do |target:, content: 'Foo bar'|
@@ -83,7 +83,7 @@ describe 'ninep put' do
 
   describe 'nonexisting server' do
     def run_put *args
-      run_ninep('put', '--aname', 'ctl', *args)
+      run_nonop('put', '--aname', 'ctl', *args)
     end
 
     it 'a bad host exits w/ an error' do

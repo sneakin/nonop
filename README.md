@@ -1,4 +1,4 @@
-# NineP
+# NonoP
 
 ~9P2000.L~ utilities and SDK for Ruby.
 

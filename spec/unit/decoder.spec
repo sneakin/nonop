@@ -1,6 +1,6 @@
-require 'ninep'
+require 'nonop'
 
-module NineP::TestData
+module NonoP::TestData
   EXCHANGE1 = <<-EOT
 > 2025/09/10 18:17:34.000106498  length=21 from=0 to=20
  15 00 00 00 64 ff ff 00 00 01 00 08 00 39 50 32 30 30 30 2e 4c
@@ -22,17 +22,17 @@ EOT
   end
 end
 
-describe NineP::Decoder do
-  let(:client_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '>' }.collect { _1[2] }.join }
-  let(:server_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '<' }.collect { _1[2] }.join }
+describe NonoP::Decoder do
+  let(:client_data) { NonoP::TestData::EXCHANGE2.select { _1[0] == '>' }.collect { _1[2] }.join }
+  let(:server_data) { NonoP::TestData::EXCHANGE2.select { _1[0] == '<' }.collect { _1[2] }.join }
 
-  subject { described_class.new(coders: NineP::Decoder::RequestReplies) }
+  subject { described_class.new(coders: NonoP::Decoder::RequestReplies) }
 
   it 'decodes all the client data' do
     more = client_data
     begin
       pkt, more = subject.unpack(more)
-      expect(pkt).to be_kind_of(NineP::Packet)
+      expect(pkt).to be_kind_of(NonoP::Packet)
       expect(more).to_not eql(nil)
     end while !more&.empty?
     expect(more).to eql("")
@@ -42,13 +42,13 @@ describe NineP::Decoder do
     more = server_data
     begin
       pkt, more = subject.unpack(more)
-      expect(pkt).to be_kind_of(NineP::Packet)
+      expect(pkt).to be_kind_of(NonoP::Packet)
       expect(more).to_not eql(nil)
     end while !more&.empty?
     expect(more).to eql("")
   end
     
-  NineP::TestData::EXCHANGE2.each do |(dir, length, data)|
+  NonoP::TestData::EXCHANGE2.each do |(dir, length, data)|
     it "decodes the test data: #{data.inspect}" do
       pkt, more = subject.unpack(data)
       expect(more).to eql("")
@@ -67,13 +67,13 @@ describe NineP::Decoder do
   end
 end
 
-describe NineP::L2000::Decoder do
-  let(:client_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '>' }.collect { _1[2] }.join }
-  let(:server_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '<' }.collect { _1[2] }.join }
+describe NonoP::L2000::Decoder do
+  let(:client_data) { NonoP::TestData::EXCHANGE2.select { _1[0] == '>' }.collect { _1[2] }.join }
+  let(:server_data) { NonoP::TestData::EXCHANGE2.select { _1[0] == '<' }.collect { _1[2] }.join }
 
   it 'handles Tauth' do
-    expect(subject.packet_types[102]).to_not be(NineP::Tauth)
-    expect(subject.packet_types[102]).to be(NineP::L2000::Tauth)
+    expect(subject.packet_types[102]).to_not be(NonoP::Tauth)
+    expect(subject.packet_types[102]).to be(NonoP::L2000::Tauth)
   end
   
   it 'decodes all the client data' do
@@ -83,7 +83,7 @@ describe NineP::L2000::Decoder do
       expect(pkt).to be_kind_of(SG::PackedStruct)
       expect(more).to_not eql(nil)
       expect(pkt.data).to be_kind_of(SG::PackedStruct)
-      expect(pkt.data).to be_kind_of(NineP::Packet::Data)
+      expect(pkt.data).to be_kind_of(NonoP::Packet::Data)
       expect(pkt.extra_data).to eql("")
     end while !more&.empty?
     expect(more).to eql("")
@@ -96,19 +96,19 @@ describe NineP::L2000::Decoder do
       expect(pkt).to be_kind_of(SG::PackedStruct)
       expect(more).to_not eql(nil)
       expect(pkt.data).to be_kind_of(SG::PackedStruct)
-      expect(pkt.data).to be_kind_of(NineP::Packet::Data)
+      expect(pkt.data).to be_kind_of(NonoP::Packet::Data)
       expect(pkt.extra_data).to eql("")
     end while !more&.empty?
     expect(more).to eql("")
   end
 
-  NineP::TestData::EXCHANGE2.each do |(dir, length, data)|
+  NonoP::TestData::EXCHANGE2.each do |(dir, length, data)|
     it "decodes the test data: #{data.inspect}" do
       pkt, more = subject.unpack(data)
       expect(pkt).to be_kind_of(SG::PackedStruct)
       expect(more).to eql("")
       expect(pkt.data).to be_kind_of(SG::PackedStruct)
-      expect(pkt.data).to be_kind_of(NineP::Packet::Data)
+      expect(pkt.data).to be_kind_of(NonoP::Packet::Data)
       expect(pkt.extra_data).to eql("")
     end
   end

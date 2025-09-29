@@ -5,7 +5,7 @@ require 'sg/ext'
 using SG::Ext
 
 require 'socket'
-require 'ninep'
+require 'nonop'
 require 'munge'
 require 'optparse'
 
@@ -80,8 +80,8 @@ paths = opts.parse(ARGV)
 paths << '' if paths.empty?
 
 sock = TCPSocket.new(host, port)
-coder = NineP.coder_for(coder, max_msglen: max_packet_size)
-client = NineP::Client.new(coder: coder, io: sock)
+coder = NonoP.coder_for(coder, max_msglen: max_packet_size)
+client = NonoP::Client.new(coder: coder, io: sock)
 
 Signal.trap('INT') do
   client.close
@@ -92,7 +92,7 @@ end
 
 client.start do |pkt|
   if block_size >= pkt.msize
-    block_size = pkt.msize - NineP::Decoder::MIN_MSGLEN
+    block_size = pkt.msize - NonoP::Decoder::MIN_MSGLEN
   end
 
   main_loop = lambda do |*a|
@@ -113,12 +113,12 @@ client.start do |pkt|
         raise file if StandardError === file
 
         doner = lambda do |*state|
-          NineP.vputs("ALL DONE")
+          NonoP.vputs("ALL DONE")
           client.close
         end
 
-        NineP::Async.reduce(reader, 0, write_offset) do |data_block, count, offset, &cc|
-          NineP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
+        NonoP::Async.reduce(reader, 0, write_offset) do |data_block, count, offset, &cc|
+          NonoP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
           file.write(data_block, offset: offset) do |reply|
             if nil == reply
               cc.call(true, count, offset, &doner)

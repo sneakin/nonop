@@ -5,7 +5,7 @@ require 'sg/ext'
 using SG::Ext
 
 require 'socket'
-require 'ninep'
+require 'nonop'
 require 'munge'
 require 'optparse'
 
@@ -63,8 +63,8 @@ paths = opts.parse(ARGV)
 paths << '' if paths.empty?
 
 sock = TCPSocket.new(host, port)
-coder = NineP.coder_for(coder)
-client = NineP::Client.new(coder: coder, io: sock)
+coder = NonoP.coder_for(coder)
+client = NonoP::Client.new(coder: coder, io: sock)
 
 Signal.trap('INT') do
   client.close
@@ -86,7 +86,7 @@ end
 # A read loop
 def read_fn file, offset, length, &blk
   # todo move into RemoteFile?
-  NineP::Async.reduce(Range.new(offset, offset + length).step(length),
+  NonoP::Async.reduce(Range.new(offset, offset + length).step(length),
                       offset) do |count, offset, &cc|
     file.read(length, offset: offset) do |data|
       raise data if StandardError === data # todo where is it handled?
@@ -106,12 +106,12 @@ client.start do |pkt|
     client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
       raise attachment if StandardError === attachment
       # A loop through the paths but only after tte callbacks complete
-      NineP::Async.reduce(paths, []) do |path, counts, &cc|
+      NonoP::Async.reduce(paths, []) do |path, counts, &cc|
         path, max_count, offset = parse_path(path)
-        NineP.vputs { "Reading path #{path} #{max_count} #{offset}" }
+        NonoP.vputs { "Reading path #{path} #{max_count} #{offset}" }
         attachment.open(path, flags: [:RDONLY]) do |file|
           fin = lambda do |final_count|
-            NineP.vputs { paths.zip(final_count).to_a.inspect }
+            NonoP.vputs { paths.zip(final_count).to_a.inspect }
             client.close
             $had_errors = final_count.any? { RuntimeError === _1  }
           end

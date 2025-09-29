@@ -1,21 +1,21 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'ninep/async'
+require 'nonop/async'
 
-describe NineP::Async do
+describe NonoP::Async do
   let(:test_data) { [ 1, 2, 3, 4 ] }
 
   describe '.reduce' do
     it 'loops through data provided by a proc' do
-      r = NineP::Async.reduce(test_data, []) do |el, acc, &cc|
+      r = NonoP::Async.reduce(test_data, []) do |el, acc, &cc|
         cc.call(el == 3, acc + [ el * el ])
       end
       expect(r).to eql([[1,4,9]])
     end
 
     it 'does not loop when the continuation is not called' do
-      r = NineP::Async.reduce(test_data, []) do |el, acc, &cc|
+      r = NonoP::Async.reduce(test_data, []) do |el, acc, &cc|
         [ acc + [ el * el ] ]
       end
       expect(r).to eql([[1]])
@@ -24,7 +24,7 @@ describe NineP::Async do
     it 'calls the continuation block once at the end' do
       en = test_data.each
       fin_calls = 0
-      r = NineP::Async.reduce(test_data, []) do |el, acc, &cc|
+      r = NonoP::Async.reduce(test_data, []) do |el, acc, &cc|
         cc.call(el == 3, acc + [ el * el ]) do |facc|
           expect(facc).to eql([1,4,9])
           fin_calls += 1
@@ -39,7 +39,7 @@ describe NineP::Async do
       en = test_data.each
       delayed_fn = nil
       final_acc = nil
-      r = NineP::Async.reduce(test_data, []) do |el, acc, &cc|
+      r = NonoP::Async.reduce(test_data, []) do |el, acc, &cc|
         if el == 1
           delayed_fn = lambda do
             cc.call(el == 3, acc + [ el * el ]) do |acc|

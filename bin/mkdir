@@ -5,7 +5,7 @@ require 'sg/ext'
 using SG::Ext
 
 require 'socket'
-require 'ninep'
+require 'nonop'
 require 'munge'
 require 'optparse'
 
@@ -62,8 +62,8 @@ paths = opts.parse(ARGV)
 paths << '' if paths.empty?
 
 sock = TCPSocket.new(host, port)
-coder = NineP.coder_for(coder)
-client = NineP::Client.new(coder: coder, io: sock)
+coder = NonoP.coder_for(coder)
+client = NonoP::Client.new(coder: coder, io: sock)
 
 Signal.trap('INT') do
   client.close
@@ -73,8 +73,8 @@ Signal.trap('QUIT') do
 end
 
 def dir_loop attachment, paths, max_name: 0, short_list: true, &blk
-  NineP::Async.reduce(paths) do |path, &cc|
-    path = NineP::RemotePath.new(path)
+  NonoP::Async.reduce(paths) do |path, &cc|
+    path = NonoP::RemotePath.new(path)
     attachment.opendir(path.parent) do |parent|
       if StandardError === parent
         $stderr.puts("%s - %s" % [ path, parent ])

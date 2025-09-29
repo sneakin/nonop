@@ -1,7 +1,7 @@
 require_relative '../spec-helper'
 
-describe 'ninep cat' do
-  include NineP::SpecHelper
+describe 'nonop cat' do
+  include NonoP::SpecHelper
   
   describe 'on a test server' do
     before :all do
@@ -14,7 +14,7 @@ describe 'ninep cat' do
 
     describe 'with ctl aname' do
       def run_cat *args, &blk
-        run_ninep('cat', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
+        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
       end
       
       describe 'with paths' do
@@ -65,7 +65,7 @@ EOT
 
   describe 'nonexisting server' do
     def run_cat *args
-      run_ninep('cat', '--aname', 'ctl', *args)
+      run_nonop('cat', '--aname', 'ctl', *args)
     end
 
     it 'a bad host exits w/ an error' do
