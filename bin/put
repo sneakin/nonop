@@ -98,10 +98,12 @@ client.start do |pkt|
   main_loop = lambda do |*a|
     client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
       raise attachment if StandardError === attachment
+
       reader = Enumerator.new do |y|
-        while data = $stdin.read(block_size)
+        begin
+          data = $stdin.read(block_size)
           y << data
-        end
+        end until data.empty?
         raise StopIteration
       rescue IOError
         raise StopIteration
@@ -118,7 +120,9 @@ client.start do |pkt|
         NineP::Async.reduce(reader, 0, write_offset) do |data_block, count, offset, &cc|
           NineP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
           file.write(data_block, offset: offset) do |reply|
-            if StandardError === reply
+            if nil == reply
+              cc.call(true, count, offset, &doner)
+            elsif StandardError === reply
               cc.call(reply, count, offset, &doner)
             else
               if data_block.bytesize < block_size

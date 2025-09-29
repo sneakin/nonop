@@ -4,9 +4,11 @@ end
 module NineP::SpecHelper
   NINEP_PATH = 'bin/ninep'
   
-  def run_ninep *args, &blk
-    blk ||= lambda { _1.read }
-    data = IO.popen([ 'bundle', 'exec', NINEP_PATH, *args], 'r', &blk)
+  def run_ninep *args, mode: nil, &blk
+    blk ||= /^w/ === mode ? lambda { |_| true } : lambda { _1.read }
+    data = IO.popen([ 'bundle', 'exec', NINEP_PATH, *args],
+                    mode || 'r',
+                    &blk)
     @status = $?
     data
   end
@@ -33,8 +35,7 @@ class String
     split("\n").collect(&:split).zip(data).all? do |output, expecting|
       output.zip(expecting).all? do |o, e|
         case e
-        when Class then e === o
-        when Regexp then o =~ e
+        when Class, Regexp then e === o
         else o == e
         end
       end

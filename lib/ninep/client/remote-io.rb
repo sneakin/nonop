@@ -46,7 +46,15 @@ module NineP
 
     def write data, offset: 0, length: nil, &blk
       raise ArgumentError.new("Offset must be positive") if offset < 0
-
+      if data == nil
+        if blk
+          blk.call(nil)
+          return self
+        else
+          return 0
+        end
+      end
+      
       length ||= data.size
       block_size = client.max_datalen
       slices = NineP.block_string(data, block_size, length: length)
