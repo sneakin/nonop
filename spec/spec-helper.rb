@@ -1,5 +1,9 @@
-module NineP
-end
+require 'sg/ext'
+using SG::Ext
+
+require 'ninep/util'
+
+$verbose = ENV['VERBOSE'].to_bool
 
 module NineP::SpecHelper
   NINEP_PATH = 'bin/ninep'
@@ -30,15 +34,24 @@ module NineP::SpecHelper
   end
 end
 
-class String
-  def table_of? data
-    split("\n").collect(&:split).zip(data).all? do |output, expecting|
+RSpec::Matchers.define :be_table_of do |data|
+  match do |actual|
+    @failures = []
+    @actual = case actual
+              when String then actual.split("\n").collect(&:split)
+              else actual
+              end
+    @actual.zip(data).all? do |output, expecting|
       output.zip(expecting).all? do |o, e|
         case e
         when Class, Regexp then e === o
         else o == e
         end
-      end
+      end.tap { @failures << [ output, expecting ] unless _1 }
     end
+  end
+
+  failure_message do |actual|
+    @failures.collect { "   %s\n!= %s" % [ _1.inspect, _2.inspect ] }.join("\n")
   end
 end
