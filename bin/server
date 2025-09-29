@@ -80,7 +80,7 @@ auth = case auth_provider
        when 'yes' then NineP::Server::YesAuth.new(users)
        else raise ArgumentError.new("Unknown auth provider: #{auth_provider}")
        end
-srvenv = NineP::Server::Environment.new(authsrv: auth)
+srvenv = NineP::Server::Environment.new(reactor: reactor, authsrv: auth)
 
 fs = NineP::Server::HashFileSystem.
   new(umask: default_umask,

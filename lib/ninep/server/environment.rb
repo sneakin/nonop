@@ -3,10 +3,12 @@ using SG::Ext
 
 module NineP::Server
   class Environment
+    attr_reader :reactor
     attr_reader :authsrv, :auth_qid
     attr_reader :exports, :connections
 
-    def initialize authsrv: nil
+    def initialize reactor:, authsrv: nil
+      @reactor = reactor
       @authsrv = authsrv
       @exports = {}
       @auth_qid = NineP::Qid.new(type: NineP::Qid::Types[:AUTH], version: 0, path: '')
@@ -32,6 +34,9 @@ module NineP::Server
 
     def untrack_connection conn
       @connections.delete(conn)
+      # fixme ideally the reactor does this
+      reactor.del_input(conn.input)
+      reactor.del_output(conn.output)
       self
     end
 

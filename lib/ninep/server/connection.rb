@@ -22,13 +22,16 @@ module NineP::Server
       "\#<%s %s:%s>" % [ self.class.name,
                          @io.remote_address.ip_address,
                          @io.remote_address.ip_port ]
+    rescue Errno::ENOTCONN
+      super
     end
 
     def close
-      return if closed?
-      NineP.vputs { "Closing #{self}" }
+      return self if closed?
+      NineP.vputs { "Closing #{self} #{closed?}" }
       @output.close
-      @io.close
+      self
+    ensure
       environment.untrack_connection(self)
       @closed = true
       self
