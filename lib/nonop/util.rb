@@ -7,7 +7,8 @@ module NonoP
     io.puts(*lines) unless lines.blank?
     if blk
       more = blk.call
-      puts(more) if more
+      more = [ more ] unless Array === more
+      io.puts(*more) if more
     end
   end
 
