@@ -8,197 +8,11 @@ require_relative '../remote-path'
 
 module NineP::Server
   class HashFileSystem < FileSystem
-    BLOCK_SIZE = 4096
-
-    MODE_WRITEABLE = 0664
-    MODE_READABLE = 0444
-    MODE_EXECUTABLE = 0775
-
-    DEFAULT_DIR_ATTRS = {
-      valid: 0xFFFF, # mask of set fields
-      mode: PermMode::DIR | MODE_EXECUTABLE,
-      uid: Process.uid,
-      gid: Process.gid,
-      nlink: 1,
-      rdev: 0,
-      blksize: BLOCK_SIZE,
-      atime_sec: Time.now,
-      atime_nsec: 0,
-      mtime_sec: Time.now,
-      mtime_nsec: 0,
-      ctime_sec: Time.now,
-      ctime_nsec: 0,
-      btime_sec: Time.now,
-      btime_nsec: 0,
-      gen: 0,
-      data_version: 0
-    }
-
-    DEFAULT_FILE_ATTRS = DEFAULT_DIR_ATTRS.
-      merge(mode: PermMode::FILE | MODE_READABLE)
-
-    # Represents files in the HashFileSystem.
-    class Entry
-      # Provides the data for OpenedEntry hhat is dependent on the entry's type.
-      class DataProvider
-        # @abstract
-        # @param mode [Integer]
-        # @return [self]
-        # @raise SystemCallError
-        def open mode
-          self
-        end
-
-        # @abstract
-        # @return [self]
-        # @raise SystemCallError
-        def close
-          self
-        end
-
-        # @abstract
-        # @param size [Integer]
-        # @return [self]
-        # @raise SystemCallError
-        def truncate size = 0
-          raise Errno::ENOTSUP
-        end
-
-        # @abstract
-        # @param count [Integer]
-        # @param offset [Integer]
-        # @return [String]
-        # @raise SystemCallError
-        def read count, offset = 0
-          raise Errno::ENOTSUP
-        end
-
-        # @abstract
-        # @param data [String]
-        # @param offset [Integer]
-        # @return [Integer]
-        # @raise SystemCallError
-        def write data, offset = 0
-          raise Errno::ENOTSUP
-        end
-      end
-
-      # Provides a per connection interface to an Entry using a DataProvider to tailor the operations.
-      class OpenedEntry
-        # @return [Entry]
-        attr_reader :entry
-        # @return [Integer]
-        attr_reader :mode
-        # @return [DataProvider]
-        attr_reader :data
-
-        # @param entry [Entry]
-        # @param mode [Integer]
-        # @param data [DataProvider]
-        def initialize entry, mode, data
-          @entry = entry
-          @mode = mode
-          @data = data
-        end
-
-        # @return [self]
-        def close
-          @data&.close
-          @mode = @data = nil
-          self
-        end
-
-        delegate :truncate, :read, :write, :readdir, to: :data
-
-        # @return [Boolean]
-        def writeable?
-          (nil != @mode) &&
-            ((0 != ((@mode || 0) & (NineP::L2000::Topen::Flags[:WRONLY] | NineP::L2000::Topen::Flags[:RDWR]))))
-        end
-
-        # @return [Boolean]
-        def readable?
-          (nil != @mode) &&
-            ((0 == (@mode || 0) & NineP::L2000::Topen::Mask[:MODE]) ||
-             (0 != ((@mode || 0) & (NineP::L2000::Topen::Flags[:RDONLY] | NineP::L2000::Topen::Flags[:RDWR]))))
-        end
-      end
-
-      # @return [String]
-      attr_reader :name
-      # @return  [Integer, nil]
-      attr_reader :umask
-
-      # @param name String
-      # @param umask [Integer, nil]
-      def initialize name, umask: nil
-        @name = name
-        @umask = umask || File.umask
-      end
-
-      # @return [Qid]
-      def qid
-        @qid ||= NineP::Qid.new(type: NineP::Qid::Types[:FILE],
-                                version: 0,
-                                path: name[0, 8])
-      end
-
-      # @abstract
-      # @return [Integer]
-      def size
-        0
-      end
-
-      # @abstract
-      # @param p9_mode [Integer]
-      # @param data [DataProvider, nil]
-      # @return [OpenedEntry]
-      # @raise SystemCallError
-      def open p9_mode, data = nil
-        OpenedEntry.new(self, p9_mode, data || DataProvider.new)
-      end
-
-      # @abstract
-      # @return [self]
-      # @raise SystemCallError
-      def close
-        self
-      end
-
-      # @abstract
-      # @param name String
-      # @param flags [Integer]
-      # @param mode [Integer]
-      # @param gid [Integer]
-      # @return [Boolean]
-      # @raise SystemCallError
-      def create name, flags, mode, gid
-        raise Errno::ENOTSUP
-      end
-
-      # @return [Hash<Symbol, Object>]
-      def attrs
-        @attrs ||= DEFAULT_FILE_ATTRS.
-          merge(qid: qid,
-                mode: PermMode::FILE | MODE_READABLE & ~umask)
-      end
-
-      # @abstract
-      # @return [Hash<Symbol, Object>]
-      # @raise SystemCallError
-      def getattr
-        attrs.merge(size: size, blocks: size / BLOCK_SIZE)
-      end
-
-      # @abstract
-      # @param attrs [Hash<Symbol, Object>]
-      # @return [self]
-      # @raise SystemCallError
-      def setattr attrs
-        raise Errno::ENOTSUP
-      end
+    class Entry < FileSystem::Entry
     end
-
+    class OpenedEntry < FileSystem::OpenedEntry
+    end
+    
     # Read only entries backed by String, Proc, or Pathname#read generated strings.
     class StaticEntry < Entry
       class DataProvider < Entry::DataProvider
@@ -369,9 +183,9 @@ module NineP::Server
 
       # @return [Hash<Symbol, Object>]
       def attrs
-        @attrs ||= DEFAULT_FILE_ATTRS.
+        @attrs ||= FileSystem::DEFAULT_FILE_ATTRS.
           merge(qid: qid,
-                mode: (PermMode::FILE | ((@writeable ? MODE_WRITEABLE : MODE_READABLE) & ~umask)))
+                mode: (PermMode::FILE | ((@writeable ? PermMode::RW : PermMode::R) & ~umask)))
       end
 
       # @param attrs [Hash<Symbol, Object>]
@@ -457,15 +271,15 @@ module NineP::Server
 
       # @return [Hash<Symbol, Object>]
       def attrs
-        @attrs ||= DEFAULT_FILE_ATTRS.
+        @attrs ||= FileSystem::DEFAULT_FILE_ATTRS.
           merge(qid: qid,
-                mode: PermMode::FILE | ((data.frozen? ? MODE_READABLE : MODE_WRITEABLE) & ~umask))
+                mode: PermMode::FILE | ((data.frozen? ? PermMode::R : PermMode::RW) & ~umask))
       end
 
       # @param attrs [Hash<Symbol, Object>]
       # @return [self]
-      def setattr attrs
-        @attrs = @attrs.merge(attrs) # todo be picky
+      def setattr new_attrs
+        @attrs = attrs.merge(new_attrs) # todo be picky
         self
       end
     end
@@ -522,9 +336,11 @@ module NineP::Server
       # @param entries [Hash<String, Object>]
       # @param root [Boolean]
       # @param umask [Integer, nil]
-      def initialize name, umask: nil, entries:, root: false
+      # @param writeable [Boolean]
+      def initialize name, umask: nil, entries: nil, root: false, writeable: false
         super(name, umask:)
         @is_root = root
+        @writeable = writeable
         @entries = Hash[(entries || {}).collect { |name, data|
                           [ name,
                             case data
@@ -537,6 +353,11 @@ module NineP::Server
                           ]}]
       end
 
+      # @return [Boolean]
+      def writeable?
+        !!@writeable
+      end
+      
       # @return [Boolean]
       def is_root?
         !!@is_root
@@ -572,11 +393,26 @@ module NineP::Server
       # @return [Hash<Symbol, Object>]
       # @raise SystemCallError
       def getattr
-        DEFAULT_DIR_ATTRS.
+        FileSystem::DEFAULT_DIR_ATTRS.
           merge(qid: qid,
                 size: @entries.size,
-                mode: (PermMode::DIR | MODE_EXECUTABLE) & ~umask,
-                blocks: @entries.size / BLOCK_SIZE)
+                mode: PermMode::DIR | ((writeable?? PermMode::RWX : PermMode::RX) & ~umask),
+                blocks: @entries.size / FileSystem::BLOCK_SIZE)
+      end
+
+      # @param name [String]
+      # @param flags [Integer]
+      # @param mode [Integer]
+      # @param gid [Integer]
+      # @return [OpenedEntry]
+      def create name, flags, mode, gid
+        raise Errno::ENOTSUP unless writeable?
+        ent = @entries[name] = BufferEntry.new(name, '', umask: umask)
+        attrs = {}
+        attrs[:gid] = gid if gid
+        attrs[:mode] = PermMode::FILE | (mode & ~umask) if mode
+        ent.setattr(attrs) unless attrs.empty?
+        ent.open(flags)
       end
     end
 

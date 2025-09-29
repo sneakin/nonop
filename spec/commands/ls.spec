@@ -26,6 +26,7 @@ describe 'ninep ls' do
   config
   info
   scratch
+  tmp
   welcome
 EOT
           end
@@ -36,6 +37,7 @@ EOT
             expect(strip_escapes(io.read)).to eql(<<-EOT)
 /:
   scratch
+  tmp
   info
   config
   welcome
@@ -64,9 +66,10 @@ EOT
                 to be_table_of(stats_table(<<-EOT))
 /:
   README.md        289 100440
-  config             3  40750
-  info               2  40750
+  config             3  40550
+  info               2  40550
   scratch            0 100640
+  tmp                0  40750
   welcome            7 100640
 EOT
             end
@@ -78,8 +81,9 @@ EOT
                 to be_table_of(stats_table(<<-EOT))
 /:
   scratch            0 100640
-  info               2  40750
-  config             3  40750
+  tmp                0  40750
+  info               2  40550
+  config             3  40550
   welcome            7 100640
   README.md        289 100440
 EOT

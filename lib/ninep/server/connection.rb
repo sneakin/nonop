@@ -200,7 +200,7 @@ module NineP::Server
       stream = @open_fids.fetch(pkt.data.fid)
       NineP.vputs { "Creating #{pkt.data.fid} #{stream.qid.inspect}" }
       begin
-        stream.create(pkt.data.name, pkt.data.flags, pkt.data.mode, pkt.data.gid)
+        stream.create(pkt.data.name.to_s, pkt.data.flags, pkt.data.mode, pkt.data.gid)
         reply_to(pkt, NineP::Rcreate.new(qid: stream.qid || stream.fs.qid,
                                          iounit: 0))
       rescue KeyError

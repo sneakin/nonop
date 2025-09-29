@@ -98,6 +98,7 @@ ctlfs = NineP::Server::HashFileSystem.
       entries: {
         'welcome' => "Hello!\n",
         'scratch' => NineP::Server::HashFileSystem::FileEntry.new('scratch', path: scratch_file.path, writeable: true),
+        'tmp' => NineP::Server::HashFileSystem::DirectoryEntry.new('tmp', writeable: true),
         'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
         'info' => {
           'now' => lambda { Time.now },

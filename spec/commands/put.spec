@@ -19,48 +19,64 @@ describe 'ninep put' do
       def run_put *args, &blk
         run_ninep('put', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, mode: 'w', &blk)
       end
+
+      shared_examples_for 'happy put' do |target:, content: 'Foo bar'|
+        target = [ target ] unless Enumerable === target
+        
+        it 'writes the contents' do
+          run_put(*target) { |io| io.puts(content) }
+          run_cat(target.first) { |io|
+            expect(io.read).to eql(content + "\n")
+          }
+        end
+
+        if target.size > 1
+          it 'writes only the first path' do
+            run_put(*target) { |io| io.puts(content) }
+            target[1...-1].each { |tgt|
+              run_cat(tgt) { |io|
+                expect(io.read).to_not eql(content + "\n")
+              }
+            }
+          end
+        end
+
+        it 'exits w/ no error' do
+          expect { run_put(*target) { _1.puts(content) } }.
+            to change { @status&.exitstatus }.to(0)
+        end
+      end
       
       describe 'with paths' do
         describe 'good path' do
-          it 'prints the contents' do
-            run_put('scratch') do |io|
-              io.puts("Hello hello")
-            end
-            
-            run_cat('scratch') do |io|
-              expect(io.read).to eql("Hello hello\n")
-            end
-          end
-          it 'exits w/ no error' do
-            expect { run_put('scratch') { _1.close } }.
-              to change { @status&.exitstatus }.to(0)
-          end
+          it_should_behave_like 'happy put', target: 'scratch', content: 'Hello hello'
         end
         
         describe 'bad path' do
-          it 'fails to create'
-          it 'exits w/ an error' do
-            expect { run_put('notfound') }.
-              to change { @status&.exitstatus }.to(1)
+          describe 'fails to create' do
+            it 'does not change the contents' do
+              content = 'Not this time.'
+              run_put('notfound') { |io| io.puts(content) }
+              run_cat('notfound') { |io|
+                expect(io.read).to eql("")
+              }
+            end
+            it 'exits w/ an error' do
+              expect { run_put('notfound') }.
+                to change { @status&.exitstatus }.to(1)
+            end
+          end
+
+          describe 'can create' do
+            it_should_behave_like 'happy put', target: ['tmp/hello'], content: 'Hello hello'
+            it_should_behave_like 'happy put', target: ['tmp/again'], content: 'Hello'
+            it_should_behave_like 'happy put', target: ['tmp/again'], content: 'Hello again'
           end
         end
 
         describe 'good and bad path' do
-          it 'updates just the first path' do
-            run_put('scratch', 'bad', 'huh') do |io|
-              io.puts("Hey")
-            end
-            
-            run_cat('scratch') do |io|
-              expect(io.read).to eql("Hey\n")
-            end
-          end
-          it 'exits w/ no error' do
-            expect { run_put('scratch', 'bad', 'scratch') { _1.puts("Hey") } }.
-              to change { @status&.exitstatus }.to(0)
-          end
+          it_should_behave_like 'happy put', target: ['scratch', 'bad', 'scratch'], content: 'Hello hello'
         end
-
       end
     end
   end
