@@ -1,32 +1,15 @@
+require_relative '../spec-helper'
+
 describe 'ninep ls' do
-  NINEP_PATH = 'bin/ninep'
+  include NineP::SpecHelper
   
-  def run_ninep *args, &blk
-    blk ||= lambda { _1.read }
-    data = IO.popen([ 'bundle', 'exec', NINEP_PATH, *args], 'r', &blk)
-    @status = $?
-    data
-  end
-
-  def start_server *args
-    pid = Process.spawn('bundle', 'exec', NINEP_PATH, 'server', '--port', '10000', '--auth-provider', 'yes', *args)
-    now = Time.at(Time.now.to_i + 1).strftime("%x %X") # fixme regex match? data table?
-    sleep(2) # fixme need a signal of sorts
-    [ pid, now ]
-  end
-
-  def strip_escapes str
-    str.gsub(/\e\[[^m]*m/, '').gsub(/\s+($|\Z)/, '') + "\n"
-  end
-
   describe 'on a test server' do
     before :all do
       @server, @started_at = start_server
     end
 
     after :all do
-      Process.kill('TERM', @server)
-      Process.wait(@server)
+      stop_server(@server)
     end
 
     describe 'with ctl aname' do
@@ -99,9 +82,9 @@ EOT
             to change { @status&.exitstatus }.to(0)
         end
         
-        it 'with a bad one, exits w/ 0 too' do # fixme?
+        it 'with a bad one, exits w/ 1' do
           expect { run_ls('config', 'bad', 'info') }.
-            to change { @status&.exitstatus }.to(0)
+            to change { @status&.exitstatus }.to(1)
         end
         
         it 'lists the directories' do

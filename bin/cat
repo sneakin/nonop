@@ -113,6 +113,7 @@ client.start do |pkt|
           fin = lambda do |final_count|
             NineP.vputs { paths.zip(final_count).to_a.inspect }
             client.close
+            $had_errors = final_count.any? { RuntimeError === _1  }
           end
           if StandardError === file
             $stderr.puts(file.message)
@@ -148,3 +149,4 @@ end
 
 client.read_loop
 
+exit(1) if $had_errors

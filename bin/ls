@@ -92,6 +92,7 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, 
       puts("%s:" % [ path.empty?? '/' : path.to_s ])
       if StandardError === dir
         $stderr.puts("%s - %s" % [ path, dir ])
+        $had_errors = true
         next cc.call(false, &blk)
       end
 
@@ -173,3 +174,5 @@ client.start do |pkt|
 end
 
 client.read_loop
+
+exit(1) if $had_errors
