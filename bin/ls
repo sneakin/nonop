@@ -18,7 +18,7 @@ uname = ENV['USER']
 auth_creds = nil
 aname = '/'
 short_list = true
-sort_field = nil
+sort_field = :name
 reverse_sort = false
 
 opts = OptionParser.new do |o|
@@ -89,6 +89,7 @@ end
 def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, reverse_sort: false, &blk
   NineP::Async.reduce(paths) do |path, &cc|
     attachment.opendir(path) do |dir|
+      puts("%s:" % [ path.empty?? '/' : path.to_s ])
       if StandardError === dir
         $stderr.puts("%s - %s" % [ path, dir ])
         next cc.call(false, &blk)

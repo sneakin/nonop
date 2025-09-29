@@ -116,8 +116,9 @@ module NineP::Server
       if pkt.data.uname != nil || 0xFFFFFFFF == pkt.data.n_uname
         # todo auth against per export databases
         user = pkt.data.n_uname == 0xFFFFFFFF ? pkt.data.uname.to_s : pkt.data.n_uname
-        NineP.vputs { "Authenticating #{user}" }
-        if environment.auth(user, nil)
+        NineP.vputs { "Legacy Authenticating #{user}" }
+        # fixme  even safe?
+        if environment.has_user?(user)
           @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
           reply_to(pkt, NineP::L2000::Rattach.new(aqid: environment.auth_qid))
         else
