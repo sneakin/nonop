@@ -44,32 +44,44 @@ EOT
           end
         end
 
+        DateRegex = /(\d+)\/(\d+)\/(\d+)/
+        TimeRegex = /(\d+):(\d+):(\d+)/
+
+        def stats_table str
+          stats = [ uid.to_s, gid.to_s, DateRegex, TimeRegex ]
+          str.split("\n").collect {
+            _1.include?(':') ? [ _1 ] : [ *_1.split, *stats ]
+          }
+        end
+        
         describe 'with "-l"' do
           let(:uid) { Process.uid }
           let(:gid) { Process.gid }
           
           it 'prints the stats with "-l"' do
             run_ls('-l') do |io|
-              expect(strip_escapes(io.read)).to eql(<<-EOT)
+              expect(strip_escapes(io.read)).
+                to be_table_of(stats_table(<<-EOT))
 /:
-  README.md        289 100440     #{uid}     #{gid}  #{@started_at}
-  config             3  40750     #{uid}     #{gid}  #{@started_at}
-  info               2  40750     #{uid}     #{gid}  #{@started_at}
-  scratch            0 100640     #{uid}     #{gid}  #{@started_at}
-  welcome            7 100640     #{uid}     #{gid}  #{@started_at}
+  README.md        289 100440
+  config             3  40750
+  info               2  40750
+  scratch            0 100640
+  welcome            7 100640
 EOT
             end
           end
 
           it 'sorts by size with "--sort size"' do
             run_ls('-l', '--sort', 'size') do |io|
-              expect(strip_escapes(io.read)).to eql(<<-EOT)
+              expect(strip_escapes(io.read)).
+                to be_table_of(stats_table(<<-EOT))
 /:
-  scratch            0 100640     #{uid}     #{gid}  #{@started_at}
-  info               2  40750     #{uid}     #{gid}  #{@started_at}
-  config             3  40750     #{uid}     #{gid}  #{@started_at}
-  welcome            7 100640     #{uid}     #{gid}  #{@started_at}
-  README.md        289 100440     #{uid}     #{gid}  #{@started_at}
+  scratch            0 100640
+  info               2  40750
+  config             3  40750
+  welcome            7 100640
+  README.md        289 100440
 EOT
             end
           end

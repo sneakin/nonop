@@ -27,3 +27,17 @@ module NineP::SpecHelper
     str.gsub(/\e\[[^m]*m/, '').gsub(/\s+($|\Z)/, '') + "\n"
   end
 end
+
+class String
+  def table_of? data
+    split("\n").collect(&:split).zip(data).all? do |output, expecting|
+      output.zip(expecting).all? do |o, e|
+        case e
+        when Class then e === o
+        when Regexp then o =~ e
+        else o == e
+        end
+      end
+    end
+  end
+end
