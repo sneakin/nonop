@@ -153,7 +153,8 @@ module NineP::Server
       # @return [Hash<Symbol, Object>]
       # @raise SystemCallError
       def getattr
-        attrs.merge(size: size, blocks: size / BLOCK_SIZE)
+        attrs.merge(size: size,
+                    blocks: size == 0 ? 0 : (1 + size / BLOCK_SIZE))
       end
 
       # @abstract

@@ -397,7 +397,7 @@ module NineP::Server
           merge(qid: qid,
                 size: @entries.size,
                 mode: PermMode::DIR | ((writeable?? PermMode::RWX : PermMode::RX) & ~umask),
-                blocks: @entries.size / FileSystem::BLOCK_SIZE)
+                blocks: @entries.empty?? 0 : (1 + @entries.size / FileSystem::BLOCK_SIZE))
       end
 
       # @param name [String]
