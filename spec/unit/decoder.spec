@@ -20,22 +20,18 @@ EOT
     am = a.match(/([<>])\s+(\d+\/\d+\/\d+)\s+(\d+:\d+:\d+\.\d+)\s+length=(\d+)\s+from=(\d+)\s+to=(\d+)/)
     [ am[1], am[4].to_i, data ]
   end
-  puts(EXCHANGE1)
-  puts(EXCHANGE2.inspect)
 end
 
 describe NineP::Decoder do
   let(:client_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '>' }.collect { _1[2] }.join }
   let(:server_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '<' }.collect { _1[2] }.join }
 
-  subject { described_class.new(coders: NineP::Decoder::RequestReplies.flatten.reject(&:nil?)) }
+  subject { described_class.new(coders: NineP::Decoder::RequestReplies) }
 
   it 'decodes all the client data' do
-    $stderr.puts("client")
     more = client_data
     begin
       pkt, more = subject.unpack(more)
-      $stderr.puts(pkt.inspect, more.inspect)
       expect(pkt).to be_kind_of(NineP::Packet)
       expect(more).to_not eql(nil)
     end while !more&.empty?
@@ -43,11 +39,9 @@ describe NineP::Decoder do
   end
     
   it 'decodes all the server data' do
-    $stderr.puts("server")
     more = server_data
     begin
       pkt, more = subject.unpack(more)
-      $stderr.puts(pkt.inspect, more.inspect)
       expect(pkt).to be_kind_of(NineP::Packet)
       expect(more).to_not eql(nil)
     end while !more&.empty?
@@ -57,7 +51,6 @@ describe NineP::Decoder do
   NineP::TestData::EXCHANGE2.each do |(dir, length, data)|
     it "decodes the test data: #{data.inspect}" do
       pkt, more = subject.unpack(data)
-      $stderr.puts(pkt.inspect, more.inspect, "")
       expect(more).to eql("")
       expect(pkt).to be_kind_of(SG::PackedStruct)
       expect(pkt.bytesize).to eql(length)
@@ -79,16 +72,14 @@ describe NineP::L2000::Decoder do
   let(:server_data) { NineP::TestData::EXCHANGE2.select { _1[0] == '<' }.collect { _1[2] }.join }
 
   it 'handles Tauth' do
-    expect(subject.packet_types[NineP::Tauth::ID]).to_not be(NineP::Tauth)
-    expect(subject.packet_types[NineP::Tauth::ID]).to be(NineP::L2000::Tauth)
+    expect(subject.packet_types[102]).to_not be(NineP::Tauth)
+    expect(subject.packet_types[102]).to be(NineP::L2000::Tauth)
   end
   
   it 'decodes all the client data' do
-    $stderr.puts("client")
     more = client_data
     begin
       pkt, more = subject.unpack(more)
-      $stderr.puts(pkt.inspect, pkt.data.inspect, more.inspect)
       expect(pkt).to be_kind_of(SG::PackedStruct)
       expect(more).to_not eql(nil)
       expect(pkt.data).to be_kind_of(SG::PackedStruct)
@@ -99,11 +90,9 @@ describe NineP::L2000::Decoder do
   end
     
   it 'decodes all the server data' do
-    $stderr.puts("server")
     more = server_data
     begin
       pkt, more = subject.unpack(more)
-      $stderr.puts(pkt.inspect, pkt.data.inspect, more.inspect)
       expect(pkt).to be_kind_of(SG::PackedStruct)
       expect(more).to_not eql(nil)
       expect(pkt.data).to be_kind_of(SG::PackedStruct)
@@ -116,7 +105,6 @@ describe NineP::L2000::Decoder do
   NineP::TestData::EXCHANGE2.each do |(dir, length, data)|
     it "decodes the test data: #{data.inspect}" do
       pkt, more = subject.unpack(data)
-      $stderr.puts(pkt.inspect, more.inspect, "")
       expect(pkt).to be_kind_of(SG::PackedStruct)
       expect(more).to eql("")
       expect(pkt.data).to be_kind_of(SG::PackedStruct)

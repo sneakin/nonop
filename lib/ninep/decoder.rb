@@ -149,7 +149,6 @@ module NineP
     def add_packet_types types
       types.each do
         case _1
-        when Class then add_packet_type(_1.const_get('ID'), _1)
         when Integer then add_packet_type(_1, _2)
         else raise ArgumentError, types
         end
