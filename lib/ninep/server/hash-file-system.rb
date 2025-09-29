@@ -344,7 +344,7 @@ module NineP::Server
         @entries = Hash[(entries || {}).collect { |name, data|
                           [ name,
                             case data
-                            when Entry then data
+                            when Entry then data.tap { _1.umask = umask }
                             when String then (data.frozen? ? StaticEntry : BufferEntry).new(name, data, umask: umask)
                             when Pathname then FileEntry.new(name, path: data, umask: umask)
                             when Hash then DirectoryEntry.new(name, entries: data, umask: umask)

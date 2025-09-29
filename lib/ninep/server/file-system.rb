@@ -93,13 +93,13 @@ module NineP::Server
       # @return [String]
       attr_reader :name
       # @return  [Integer, nil]
-      attr_reader :umask
+      attr_accessor :umask
 
       # @param name String
       # @param umask [Integer, nil]
       def initialize name, umask: nil
         @name = name
-        @umask = umask || File.umask
+        @umask = umask
       end
 
       # @return [Qid]
