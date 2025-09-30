@@ -35,6 +35,18 @@ module NonoP
                        [:offset, :uint64l],
                        [:type, :uint8],
                        [:name, NString])
+                       
+        def self.for_entry entry, n
+          type = case entry
+          when :directory? then DirentTypes[:DIR]
+          when :fifo? then DirentTypes[:FIFO]
+          else DirentTypes[:REG]
+          end
+          self.new(qid: entry.qid,
+                   offset: n,
+                   type: type,
+                   name: entry.name)
+        end
       end
       # size[4] Rreaddir tag[2] count[4] data[count]
       include Packet::Data

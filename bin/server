@@ -51,7 +51,7 @@ opts = OptionParser.new do |o|
   end
   o.on('-e', '--export NAME:PATH') do |v|
     name, path = v.split(':')
-    raise ArgumentError.new("Export must be NAWE:PATH.") if name.blank? || path.blank?
+    raise ArgumentError.new("Export must be NAME:PATH.") if name.blank? || path.blank?
     exports[name] = Pathname.new(path)
   end
 end

@@ -118,7 +118,7 @@ module NonoP::Server
       # @param umask [Integer, nil]
       def initialize name, umask: nil
         @name = name
-        @umask = umask
+        @umask = umask || 0
       end
 
       # @return [Qid]
@@ -134,6 +134,18 @@ module NonoP::Server
         0
       end
 
+      # @abstract
+      # @return [Boolean]
+      def directory?
+        false
+      end
+
+      # @abstract
+      # @return [Boolean]
+      def fifo?
+        false
+      end
+        
       # @abstract
       # @param p9_mode [Integer]
       # @param data [DataProvider, nil]

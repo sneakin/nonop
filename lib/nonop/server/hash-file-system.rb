@@ -1,4 +1,5 @@
 require 'pathname'
+require 'timeout'
 
 require 'sg/ext'
 using SG::Ext
@@ -194,29 +195,44 @@ module NonoP::Server
         super(p9_mode, data)
       end
 
+      # @return [Hash<String, Entry>]
       def entries
-        path.children.collect do |child|
-          name = child.basename.to_s
-          self.class.new(name, child, writeable: @writeable, umask: umask)
-        end.reduce({}) do |acc, ent|
-          acc[ent.name] = ent
-          acc
+        mtime = path.stat.mtime
+        if @entries == nil || (@last_listing && @last_listing < mtime)
+          Timeout.timeout(10) do
+            @entries = path.children.reject { %w{. ..}.include?(_1.basename) }.collect do |child|
+              name = child.basename.to_s
+              if child.mountpoint?
+                DirectoryEntry.new(name, umask: umask)
+              else
+                self.class.new(name, child, writeable: @writeable, umask: umask)
+              end
+            end.reduce({}) do |acc, ent|
+              acc[ent.name] = ent
+              acc
+            end
+            @last_listing = mtime
+          end
         end
+        
+        @entries
       end
-      
+
+      def directory?
+        path.directory?
+      end
+            
+      def fifo?
+        path.directory?
+      end
+            
       # @param count [Integer]
       # @param offset [Integer]
       # @return [Array<Dirent>]
       # @raise SystemCallError
       def readdir count, offset = 0
-        # todo wrap in dirents; entries need to be generated
-        (path.children[offset, count] || []).each_with_index.collect do |child, n|
-          type = child.directory? ? NonoP::Qid::Types[:DIR] : NonoP::Qid::Types[:FILE]
-          qid = NonoP::Qid.new(type: type, version: 0, path: child.basename.to_s[0, 8])
-          NonoP::L2000::Rreaddir::Dirent.new(qid: qid,
-                                             offset: n,
-                                             type: type,
-                                             name: child.basename.to_s)
+        (entries.values[offset, count] || []).each_with_index.collect do |child, n|
+          NonoP::L2000::Rreaddir::Dirent.for_entry(child, n)
         end
       end
 
@@ -417,6 +433,11 @@ module NonoP::Server
       def size
         data.collect(&:bytesize).sum
       end
+      
+      # @return [Boolean]
+      def fifo?
+        true
+      end
 
       # @param flags [Integer]
       # @return [OpenedEntry]
@@ -529,6 +550,11 @@ module NonoP::Server
         @qid ||= NonoP::Qid.new(type: is_root? ? NonoP::Qid::Types[:MOUNT] : NonoP::Qid::Types[:DIR],
                                 version: 0,
                                 path: name[0, 8])
+      end
+      
+      # @return [Boolean]
+      def directory?
+        true
       end
 
       # @param p9_mode [Integer]
