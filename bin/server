@@ -124,9 +124,9 @@ ctlfs = NonoP::Server::HashFileSystem.
 srvenv.export('ctl', ctlfs)
 
 listen_sock = TCPServer.new(listen_on, port)
-reactor << SG::IO::Reactor::Listener.new(listen_sock, reactor) do |client|
-  puts("Accepted client #{client}")
-  conn = NonoP::Server::Connection.new(client, srvenv)
+reactor << SG::IO::Reactor::Listener.new(listen_sock, reactor) do |sock|
+  conn = NonoP::Server::Connection.new(sock, srvenv)
+  puts("Accepted client #{conn}")
   [ conn.input, conn.output ]
 end
 
