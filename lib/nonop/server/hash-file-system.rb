@@ -195,27 +195,30 @@ module NonoP::Server
         super(p9_mode, data)
       end
 
-      # @return [Hash<String, Entry>]
-      def entries
-        mtime = path.stat.mtime
-        if @entries == nil || (@last_listing && @last_listing < mtime)
-          Timeout.timeout(10) do
-            @entries = path.children.reject { %w{. ..}.include?(_1.basename) }.collect do |child|
-              name = child.basename.to_s
-              if child.mountpoint?
-                DirectoryEntry.new(name, umask: umask)
-              else
-                self.class.new(name, child, writeable: @writeable, umask: umask)
-              end
-            end.reduce({}) do |acc, ent|
-              acc[ent.name] = ent
-              acc
-            end
-            @last_listing = mtime
+      def in_mtab? path
+        path = path.expand_path.to_s
+        File.open('/proc/mounts') do |io|
+          io.each_line do |line|
+            return true if line.split[1] == path
           end
         end
         
-        @entries
+        false
+      end
+      
+      # @return [Hash<String, Entry>]
+      def entries
+        path.children.reject { %w{. ..}.include?(_1.basename) }.collect do |child|
+          name = child.basename.to_s
+          if in_mtab?(child)
+            DirectoryEntry.new(name, umask: umask)
+          else
+            self.class.new(name, child, writeable: @writeable, umask: umask)
+          end
+        end.reduce({}) do |acc, ent|
+          acc[ent.name] = ent
+          acc
+        end
       end
 
       def directory?
