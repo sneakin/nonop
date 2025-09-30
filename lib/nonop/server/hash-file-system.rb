@@ -309,6 +309,106 @@ module NonoP::Server
       end
     end
 
+    # An entry that stores data per write in a FIFO.
+    class FifoEntry < Entry
+      # @param name [String]
+      # @param umask [Integer, nil]
+      # @yield [entry, data, offset]
+      # @yieldparam entry [WriteableEntry]
+      # @yieldparam data [String, nil]
+      # @yieldparam offset [Integer, nil]
+      # @yieldreturn [String] The new file contents.
+      def initialize name, umask: nil, &blk
+        super(name, blk.call(self), umask:)
+        @cb = blk
+      end
+
+      class DataProvider < Entry::DataProvider
+        # @return [BufferEntry]
+        attr_reader :entry
+        delegate :read, :write, :truncate, to: :entry
+
+        # @param entry [BufferEntry]
+        def initialize entry
+          @entry = entry
+        end
+      end
+
+      # @return [String]
+      attr_accessor :data
+
+      # @param name [String]
+      # @param data [String]
+      # @param umask [Integer, nil]
+      def initialize name, umask: nil
+        super(name, umask:)
+        @data = []
+      end
+
+      # @return [Qid]
+      def qid
+        @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:APPEND],
+                                version: 0,
+                                path: name[0, 8])
+      end
+      
+      # @return [Integer]
+      def size
+        data.collect(&:bytesize).sum
+      end
+
+      # @param flags [Integer]
+      # @return [OpenedEntry]
+      # @raise SystemCallError
+      def open flags
+        super(flags, DataProvider.new(self))
+      end
+
+      # @param count [Integer]
+      # @param offset [Integer]
+      # @return [String]
+      # @raise SystemCallError
+      def read count, offset = 0
+        return '' if data.empty?
+        attrs[:atime_sec] = Time.now
+        data.shift[0, count]
+      end
+
+      # @param size [Integer]
+      # @return [self]
+      # @raise SystemCallError
+      def truncate size = 0
+        @data.clear
+        attrs[:ctime_sec] = Time.now
+        self
+      end
+
+      # @param data [String]
+      # @param offset [Integer]
+      # @return [Integer]
+      # @raise SystemCallError
+      def write data, offset = 0
+        @data.push(data)
+        attrs[:mtime_sec] = Time.now
+        @cb&.call(self, data, offset)
+        data.size # todo bytesize?
+      end
+
+      # @return [Hash<Symbol, Object>]
+      def attrs
+        @attrs ||= FileSystem::DEFAULT_FILE_ATTRS.
+          merge(qid: qid,
+                mode: PermMode::FILE | (PermMode::RW & ~umask))
+      end
+
+      # @param new_attrs [Hash<Symbol, Object>]
+      # @return [self]
+      def setattr new_attrs
+        @attrs = attrs.merge(new_attrs) # todo be picky
+        self
+      end
+    end
+
     class DirectoryEntry < Entry
       class DataProvider < Entry::DataProvider
         # @return [DirectoryEntry]
