@@ -103,7 +103,7 @@ module NonoP::Server
         @open_fids[pkt.data.fid] = ErrantStream.instance
         reply_to(pkt, NonoP::L2000::Rattach.new(aqid: environment.auth_qid))
       else
-        reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
+        reply_to(pkt, NonoP::L2000::Rerror.new(Errno::ENEEDAUTH))
       end
     rescue KeyError
       if pkt.data.afid == 0xFFFFFFFF
