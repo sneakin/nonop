@@ -68,14 +68,14 @@ module NonoP::Server
     end
 
     # File backed entry with read and write support.
-    class FileEntry < Entry
+    class PathEntry < Entry
       # Allows use by multiple connections by giving each connection
       # an independent IO.
       class DataProvider < Entry::DataProvider
-        # @return [FileEntry]
+        # @return [PathEntry]
         attr_reader :entry
 
-        # @param entry [FileEntry]
+        # @param entry [PathEntry]
         # @param writeable [Boolean]
         def initialize entry, writeable = false
           @entry = entry
@@ -91,7 +91,6 @@ module NonoP::Server
           return self if @io
 
           raise Errno::ENOTSUP if (!@writeable && (0 != (p9_mode & NonoP::L2000::Topen::Mask[:MODE])))
-          raise Errno::ENOTSUP if (0 != (p9_mode & NonoP::L2000::Topen::Flags[:DIRECTORY]))
           raise Errno::ENOENT if @writeable && (0 == (p9_mode & NonoP::L2000::Topen::Flags[:CREATE])) && !path.exist?
           # todo full mapping
           mode = case p9_mode & NonoP::L2000::Topen::Mask[:MODE]
@@ -146,6 +145,14 @@ module NonoP::Server
           io.seek(offset)
           io.write(data)
         end
+
+        # @param count [Integer]
+        # @param offset [Integer]
+        # @return [Array<Dirent>]
+        # @raise SystemCallError
+        def readdir count, offset = 0
+          entry.readdir(count, offset)
+        end
       end
 
       # todo What happens if the io blocks? Ideally a reply finally gets sent when data is read w/o blocking any thing else.
@@ -158,12 +165,18 @@ module NonoP::Server
       # @param path [RemotePath, nil]
       # @param writeable [Boolean]
       # @param umask [Integer, nil]
-      def initialize name, path: nil, writeable: false, umask: nil
+      def initialize name, path, writeable: false, umask: nil
         super(name, umask:)
-        @path = (path == nil || Pathname === path) ? path : Pathname.new(path)
+        @path = Pathname === path ? path : Pathname.new(path)
         @writeable = writeable
       end
 
+      def qid
+        @qid ||= NonoP::Qid.new(type: path.directory? ? NonoP::Qid::Types[:DIR] : NonoP::Qid::Types[:FILE],
+                                version: 0,
+                                path: name.to_s[0, 8])
+      end
+      
       # @return [Integer]
       def size
         if path
@@ -181,11 +194,59 @@ module NonoP::Server
         super(p9_mode, data)
       end
 
+      def entries
+        path.children.collect do |child|
+          name = child.basename.to_s
+          self.class.new(name, child, writeable: @writeable, umask: umask)
+        end.reduce({}) do |acc, ent|
+          acc[ent.name] = ent
+          acc
+        end
+      end
+      
+      # @param count [Integer]
+      # @param offset [Integer]
+      # @return [Array<Dirent>]
+      # @raise SystemCallError
+      def readdir count, offset = 0
+        # todo wrap in dirents; entries need to be generated
+        (path.children[offset, count] || []).each_with_index.collect do |child, n|
+          type = child.directory? ? NonoP::Qid::Types[:DIR] : NonoP::Qid::Types[:FILE]
+          qid = NonoP::Qid.new(type: type, version: 0, path: child.basename.to_s[0, 8])
+          NonoP::L2000::Rreaddir::Dirent.new(qid: qid,
+                                             offset: n,
+                                             type: type,
+                                             name: child.basename.to_s)
+        end
+      end
+
       # @return [Hash<Symbol, Object>]
+      # @raise SystemCallError
       def attrs
-        @attrs ||= FileSystem::DEFAULT_FILE_ATTRS.
-          merge(qid: qid,
-                mode: (PermMode::FILE | ((@writeable ? PermMode::RW : PermMode::R) & ~umask)))
+        stat = path.stat
+        { valid: -1,
+          qid: qid,
+          gen: 0,
+          data_version: 0,
+          dev: stat.dev,
+          ino: stat.ino,
+          mode: stat.mode & ~(@writeable ? 0 : PermMode::W),
+          nlink: stat.nlink,
+          uid: stat.uid,
+          gid: stat.gid,
+          rdev: stat.rdev,
+          size: stat.size,
+          blksize: stat.blksize,
+          blocks: stat.blocks,
+          atime_sec: stat.atime.to_i,
+          atime_nsec: stat.atime.nsec,
+          mtime_sec: stat.mtime.to_i,
+          mtime_nsec: stat.mtime.nsec,
+          ctime_sec: stat.ctime.to_i,
+          ctime_nsec: stat.ctime.nsec,
+          btime_sec: 0,
+          btime_nsec: 0,
+        }
       end
 
       # @param attrs [Hash<Symbol, Object>]
@@ -193,9 +254,9 @@ module NonoP::Server
       # @raise SystemCallError
       def setattr attrs
         raise Errno::ENOTSUP unless @writeable
-        @attrs = @attrs.merge(attrs) # todo be picky
         self
       end
+
     end
 
     class BufferEntry < Entry
@@ -446,7 +507,7 @@ module NonoP::Server
                             case data
                             when Entry then data.tap { _1.umask = umask }
                             when String then (data.frozen? ? StaticEntry : BufferEntry).new(name, data, umask: umask)
-                            when Pathname then FileEntry.new(name, path: data, umask: umask)
+                            when Pathname then PathEntry.new(name, data, umask: umask)
                             when Hash then DirectoryEntry.new(name, entries: data, umask: umask)
                             else StaticEntry.new(name, data, umask: umask)
                             end

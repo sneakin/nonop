@@ -98,6 +98,15 @@ module NonoP::Server
         def write data, offset = 0
           raise Errno::ENOTSUP
         end
+
+        # @abstract
+        # @param count [Integer]
+        # @param offset [Integer]
+        # @return [Array<Dirent>]
+        # @raise SystemCallError
+        def readdir count, offset = 0
+          raise Errno::ENOTSUP
+        end
       end
 
       # @return [String]

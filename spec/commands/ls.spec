@@ -27,6 +27,7 @@ describe 'nonop ls' do
   fifo
   info
   scratch
+  src
   tmp
   welcome
 EOT
@@ -44,6 +45,7 @@ EOT
   config
   welcome
   README.md
+  src
 EOT
           end
         end
@@ -69,12 +71,13 @@ EOT
 /:
   README.md        289  100440
   config             3   40550
-  fifo               0 1000640
+  fifo               0   10640
   info               2   40550
-  scratch            0  100640
+  scratch            0  100600
+  src              422   40550
   tmp                0   40750
   welcome            7  100640
-gEOT
+EOT
             end
           end
 
@@ -83,13 +86,14 @@ gEOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  scratch            0  100640
-  fifo               0 1000640
+  scratch            0  100600
+  fifo               0   10640
   tmp                0   40750
   info               2   40550
   config             3   40550
   welcome            7  100640
   README.md        289  100440
+  src              422   40550
 EOT
             end
           end

@@ -97,9 +97,10 @@ ctlfs = NonoP::Server::HashFileSystem.
   new(umask: default_umask,
       entries: {
         'welcome' => "Hello!\n",
-        'scratch' => NonoP::Server::HashFileSystem::FileEntry.new('scratch', path: scratch_file.path, writeable: true),
+        'scratch' => NonoP::Server::HashFileSystem::PathEntry.new('scratch', scratch_file.path, writeable: true),
         'fifo' => NonoP::Server::HashFileSystem::FifoEntry.new('fifo'),
         'tmp' => NonoP::Server::HashFileSystem::DirectoryEntry.new('tmp', writeable: true),
+        'src' => NonoP::Server::HashFileSystem::PathEntry.new('src', Pathname.new(__FILE__).dirname.dirname),
         'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
         'info' => {
           'now' => lambda { Time.now },

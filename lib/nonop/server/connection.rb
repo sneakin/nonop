@@ -78,7 +78,7 @@ module NonoP::Server
     rescue
       $stderr.puts("Error on #{self}: #{$!.message}")
       NonoP.vputs { $!.backtrace.join("\n") }
-      reply_to(pkt, NonoP::L2000::Rerror.new($!))
+      reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADMSG))
       close
     end
 
