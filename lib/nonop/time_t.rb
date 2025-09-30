@@ -17,9 +17,12 @@ module NonoP
                when nil then nil
                else raise TypeError
                end
-      v
+      @n
     end
     def t= v
+      return @t if v == nil && @n != nil
+      raise TypeError.new("Must be Time or nil: not #{v.class}") unless nil == v || Time === v || self.class === v
+      v = v.t if self.class === v
       @n = v&.to_i
       @t = v
     end
