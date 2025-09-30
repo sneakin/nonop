@@ -658,8 +658,8 @@ module NonoP::Server
 
     # @param entries [Hash<String, Object>, nil]
     # @param umask [Integer, nil]
-    def initialize entries: nil, umask: nil
-      @root = DirectoryEntry.new('/', entries: entries, umask: umask, root: true)
+    def initialize root: nil, entries: nil, umask: nil
+      @root = root || DirectoryEntry.new('/', entries: entries, umask: umask, root: true)
       @next_id = 0
       @fsids = {}
     end

@@ -41,7 +41,7 @@ module NonoP::Server
     end
 
     def stats
-      { exports: exports.size,
+      { exports: exports.keys,
         connections: connections.size,
         users: authsrv.user_count,
         now: Time.now,

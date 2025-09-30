@@ -18,6 +18,7 @@ auth_db_path = nil
 auth_provider = 'munge'
 default_umask = File.umask
 reactor_timeout = 5 # secs
+exports = {}
 
 opts = OptionParser.new do |o|
   desc = 'Run a file server.'
@@ -47,6 +48,11 @@ opts = OptionParser.new do |o|
   end
   o.on('--timeout SECS') do |v|
     reactor_timeout = v.to_i
+  end
+  o.on('-e', '--export NAME:PATH') do |v|
+    name, path = v.split(':')
+    raise ArgumentError.new("Export must be NAWE:PATH.") if name.blank? || path.blank?
+    exports[name] = Pathname.new(path)
   end
 end
 args = opts.parse(ARGV)
@@ -123,6 +129,13 @@ ctlfs = NonoP::Server::HashFileSystem.
         },
       })
 srvenv.export('ctl', ctlfs)
+
+exports.each do |name, path|
+  root = NonoP::Server::HashFileSystem::PathEntry.new('/', path)
+  srvenv.export(name,
+                NonoP::Server::HashFileSystem.new(umask: default_umask,
+                                                  root: root))
+end
 
 listen_sock = TCPServer.new(listen_on, port)
 reactor << SG::IO::Reactor::Listener.new(listen_sock, reactor) do |sock|
