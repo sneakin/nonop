@@ -118,7 +118,7 @@ def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, 
       ents = if sort_field == :name
                ents.sort_by { _1[0].name }
              elsif sort_field
-               ents.sort_by { NonoP::Packet::Data === _1[1] ? _1[1].send(sort_field) : NonoP::ComparableNil.instance }
+               ents.sort_by { (!(NonoP::L2000::Rerror === _1[1]) && NonoP::Packet::Data === _1[1]) ? _1[1].send(sort_field) : NonoP::ComparableNil.instance }
              else
                ents
              end

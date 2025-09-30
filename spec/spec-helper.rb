@@ -18,8 +18,8 @@ module NonoP::SpecHelper
   end
 
   def start_server *args
-    pid = Process.spawn('bundle', 'exec', NONOP_PATH, 'server', '--port', '10000', '--auth-provider', 'yes', *args)
-    now = Time.at(Time.now.to_i + 1).strftime("%x %X") # fixme regex match? data table?
+    pid = Process.spawn('bundle', 'exec', NONOP_PATH, 'server', '--port', '10000', '--auth-provider', 'yes', '--export', 'spec:spec/spec-fs.nonofs', '--export', 'basic:examples/basic-fs.rb', *args)
+    now = Time.at(Time.now.to_i + 1).strftime("%x %X")
     sleep(2) # fixme need a signal of sorts
     [ pid, now ]
   end

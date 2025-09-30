@@ -12,12 +12,12 @@ describe 'nonop put' do
       stop_server(@server)
     end
 
-    describe 'with ctl aname' do
+    describe 'with spec aname' do
       def run_cat *args, &blk
-        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
+        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, &blk)
       end
       def run_put *args, &blk
-        run_nonop('put', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, mode: 'w', &blk)
+        run_nonop('put', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, mode: 'w', &blk)
       end
 
       shared_examples_for 'happy put' do |target:, content: 'Foo bar'|
@@ -83,7 +83,7 @@ describe 'nonop put' do
 
   describe 'nonexisting server' do
     def run_put *args
-      run_nonop('put', '--aname', 'ctl', *args)
+      run_nonop('put', '--aname', 'spec', *args)
     end
 
     it 'a bad host exits w/ an error' do

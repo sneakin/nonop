@@ -12,9 +12,9 @@ describe 'nonop cat' do
       stop_server(@server)
     end
 
-    describe 'with ctl aname' do
+    describe 'with spec aname' do
       def run_cat *args, &blk
-        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
+        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, &blk)
       end
       
       describe 'with paths' do
@@ -65,7 +65,7 @@ EOT
 
   describe 'nonexisting server' do
     def run_cat *args
-      run_nonop('cat', '--aname', 'ctl', *args)
+      run_nonop('cat', '--aname', 'spec', *args)
     end
 
     it 'a bad host exits w/ an error' do

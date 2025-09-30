@@ -1,0 +1,22 @@
+require 'tempfile'
+scratch_file = Tempfile.new
+
+def format_server_stats stats
+  max_name = stats.keys.collect { _1.to_s.size }.max
+  stats.collect { "%-*s  %s" % [ max_name, _1, _2 ] }.join("\n") + "\n"
+end
+
+NonoP::Server::HashFileSystem.
+  new(umask: default_umask,
+      entries: {
+        'welcome' => "Hello!\n",
+        'scratch' => NonoP::Server::HashFileSystem::PathEntry.new('scratch', scratch_file.path, writeable: true),
+        'fifo' => NonoP::Server::HashFileSystem::FifoEntry.new('fifo'),
+        'tmp' => NonoP::Server::HashFileSystem::DirectoryEntry.new('tmp', writeable: true),
+        'src' => NonoP::Server::HashFileSystem::PathEntry.new('src', Pathname.new(__FILE__).dirname.dirname),
+        'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
+        'info' => {
+          'now' => lambda { Time.now },
+          'stats' => lambda { format_server_stats(srvenv.stats) },
+        }
+      })

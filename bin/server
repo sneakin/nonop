@@ -88,25 +88,12 @@ auth = case auth_provider
        end
 srvenv = NonoP::Server::Environment.new(reactor: reactor, authsrv: auth)
 
-fs = NonoP::Server::HashFileSystem.
-  new(umask: default_umask,
-      entries: {
-        'abcd' => "1234\n",
-        "utf8.txt" => "😻\n".freeze
-      })
-srvenv.export('/', fs)
-
 require 'tempfile'
 scratch_file = Tempfile.new
 
 ctlfs = NonoP::Server::HashFileSystem.
   new(umask: default_umask,
       entries: {
-        'welcome' => "Hello!\n",
-        'scratch' => NonoP::Server::HashFileSystem::PathEntry.new('scratch', scratch_file.path, writeable: true),
-        'fifo' => NonoP::Server::HashFileSystem::FifoEntry.new('fifo'),
-        'tmp' => NonoP::Server::HashFileSystem::DirectoryEntry.new('tmp', writeable: true),
-        'src' => NonoP::Server::HashFileSystem::PathEntry.new('src', Pathname.new(__FILE__).dirname.dirname),
         'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
         'info' => {
           'now' => lambda { Time.now },
@@ -131,10 +118,16 @@ ctlfs = NonoP::Server::HashFileSystem.
 srvenv.export('ctl', ctlfs)
 
 exports.each do |name, path|
-  root = NonoP::Server::HashFileSystem::PathEntry.new('/', path)
-  srvenv.export(name,
-                NonoP::Server::HashFileSystem.new(umask: default_umask,
-                                                  root: root))
+  fs = if path.directory?
+         root = NonoP::Server::HashFileSystem::PathEntry.new('/', path)
+         NonoP::Server::HashFileSystem.new(umask: default_umask,
+                                           root: root)
+       elsif path.to_s =~ /\.(rb|nonofs)\Z/
+         instance_eval(File.read(path), path.to_s)
+       else
+         raise ArgumentError.new("Only directories and scripts can be exported.")
+       end
+  srvenv.export(name, fs)
 end
 
 listen_sock = TCPServer.new(listen_on, port)

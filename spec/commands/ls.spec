@@ -3,6 +3,16 @@ require_relative '../spec-helper'
 describe 'nonop ls' do
   include NonoP::SpecHelper
   
+  DateRegex = /(\d+)\/(\d+)\/(\d+)/
+  TimeRegex = /(\d+):(\d+):(\d+)/
+
+  def stats_table str
+    stats = [ uid.to_s, gid.to_s, DateRegex, TimeRegex ]
+    str.split("\n").collect {
+      _1.include?(':') ? [ _1 ] : [ *_1.split, *stats ]
+    }
+  end
+  
   describe 'on a test server' do
     before :all do
       @server, @started_at = start_server
@@ -24,12 +34,7 @@ describe 'nonop ls' do
 /:
   README.md
   config
-  fifo
   info
-  scratch
-  src
-  tmp
-  welcome
 EOT
           end
         end
@@ -38,28 +43,13 @@ EOT
           run_ls('--sort', 'size') do |io|
             expect(strip_escapes(io.read)).to eql(<<-EOT)
 /:
-  scratch
-  fifo
-  tmp
   info
   config
-  welcome
   README.md
-  src
 EOT
           end
         end
 
-        DateRegex = /(\d+)\/(\d+)\/(\d+)/
-        TimeRegex = /(\d+):(\d+):(\d+)/
-
-        def stats_table str
-          stats = [ uid.to_s, gid.to_s, DateRegex, TimeRegex ]
-          str.split("\n").collect {
-            _1.include?(':') ? [ _1 ] : [ *_1.split, *stats ]
-          }
-        end
-        
         describe 'with "-l"' do
           let(:uid) { Process.uid }
           let(:gid) { Process.gid }
@@ -71,12 +61,7 @@ EOT
 /:
   README.md        289  100440
   config             3   40550
-  fifo               0   10640
   info               2   40550
-  scratch            0  100600
-  src              422   40550
-  tmp                0   40750
-  welcome            7  100640
 EOT
             end
           end
@@ -86,14 +71,9 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  scratch            0  100600
-  fifo               0   10640
-  tmp                0   40750
   info               2   40550
   config             3   40550
-  welcome            7  100640
   README.md        289  100440
-  src              422   40550
 EOT
             end
           end
@@ -127,10 +107,109 @@ EOT
         end
       end
     end
-    
-    describe 'with aname="/"' do
+
+    describe 'with spec aname' do
       def run_ls *args, &blk
-        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', '/', *args, &blk)
+        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, &blk)
+      end
+      
+      describe 'no paths' do
+        it 'lists the root directory' do
+          run_ls do |io|
+            expect(strip_escapes(io.read)).to eql(<<-EOT)
+/:
+  README.md
+  fifo
+  info
+  scratch
+  src
+  tmp
+  welcome
+EOT
+          end
+        end
+
+        it 'sorts by size with "--sort size"' do
+          run_ls('--sort', 'size') do |io|
+            expect(strip_escapes(io.read)).to eql(<<-EOT)
+/:
+  scratch
+  fifo
+  tmp
+  info
+  welcome
+  README.md
+  src
+EOT
+          end
+        end
+
+        describe 'with "-l"' do
+          let(:uid) { Process.uid }
+          let(:gid) { Process.gid }
+          
+          it 'prints the stats with "-l"' do
+            run_ls('-l') do |io|
+              expect(strip_escapes(io.read)).
+                to be_table_of(stats_table(<<-EOT))
+/:
+  README.md        289  100440
+  fifo               0   10640
+  info               2   40550
+  scratch            0  100600
+  src              380   40550
+  tmp                0   40750
+  welcome            7  100640
+EOT
+            end
+          end
+
+          it 'sorts by size with "--sort size"' do
+            run_ls('-l', '--sort', 'size') do |io|
+              expect(strip_escapes(io.read)).
+                to be_table_of(stats_table(<<-EOT))
+/:
+  scratch            0  100600
+  fifo               0   10640
+  tmp                0   40750
+  info               2   40550
+  welcome            7  100640
+  README.md        289  100440
+  src              380   40550
+EOT
+            end
+          end
+        end
+      end
+      
+      describe 'with paths' do
+        it 'exits w/ 0 code' do
+          expect { run_ls('src', 'info') }.
+            to change { @status&.exitstatus }.to(0)
+        end
+        
+        it 'with a bad one, exits w/ 1' do
+          expect { run_ls('config', 'bad', 'info') }.
+            to change { @status&.exitstatus }.to(1)
+        end
+        
+        it 'lists the directories' do
+          run_ls('config', 'bad', 'info') do |io|
+            expect(strip_escapes(io.read)).to eql(<<-EOT)
+config:
+bad:
+info:
+  now
+  stats
+EOT
+          end
+        end
+      end
+    end
+    
+    describe 'with aname="basic"' do
+      def run_ls *args, &blk
+        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', 'basic', *args, &blk)
       end
       
       describe 'no paths' do
