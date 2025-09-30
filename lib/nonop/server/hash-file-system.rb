@@ -1,5 +1,4 @@
 require 'pathname'
-require 'timeout'
 
 require 'sg/ext'
 using SG::Ext
