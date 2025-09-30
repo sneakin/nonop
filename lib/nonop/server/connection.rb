@@ -22,7 +22,7 @@ module NonoP::Server
       "\#<%s %s:%s>" % [ self.class.name,
                          @io.remote_address.ip_address,
                          @io.remote_address.ip_port ]
-    rescue Errno::ENOTCONN
+    rescue SystemCallError
       super
     end
 
