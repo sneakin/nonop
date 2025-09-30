@@ -398,7 +398,7 @@ module NonoP::Server
       def attrs
         @attrs ||= FileSystem::DEFAULT_FILE_ATTRS.
           merge(qid: qid,
-                mode: PermMode::FILE | (PermMode::RW & ~umask))
+                mode: PermMode::FIFO | (PermMode::RW & ~umask))
       end
 
       # @param new_attrs [Hash<Symbol, Object>]

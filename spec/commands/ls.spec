@@ -67,14 +67,14 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  README.md        289 100440
-  config             3  40550
-  fifo               0 100640
-  info               2  40550
-  scratch            0 100640
-  tmp                0  40750
-  welcome            7 100640
-EOT
+  README.md        289  100440
+  config             3   40550
+  fifo               0 1000640
+  info               2   40550
+  scratch            0  100640
+  tmp                0   40750
+  welcome            7  100640
+gEOT
             end
           end
 
@@ -83,13 +83,13 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  scratch            0 100640
-  fifo               0 100640
-  tmp                0  40750
-  info               2  40550
-  config             3  40550
-  welcome            7 100640
-  README.md        289 100440
+  scratch            0  100640
+  fifo               0 1000640
+  tmp                0   40750
+  info               2   40550
+  config             3   40550
+  welcome            7  100640
+  README.md        289  100440
 EOT
             end
           end

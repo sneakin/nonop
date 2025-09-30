@@ -6,16 +6,26 @@ require 'nonop/remote-path'
 
 module NonoP::Server
   module PermMode
-    PERMS = 0777
-    DIR = 040000
-    FILE = 0100000
+    PERMS = 0007777
+    FTYPE = 0170000
 
-    W = 0222
-    R = 0444
-    X = 0111
-    RWX = R | W | X
-    RX = R | X
-    RW = R | W
+    DIR   = 040000
+    CHAR  = 020000
+    BLOCK = 010000
+    FILE  = 0100000
+    FIFO  = 0010000
+    LINK  = 0120000
+    SOCK  = 0140000
+
+    SUID  = 04000
+    SGID  = 02000
+    SVTX  = STICKY = 01000
+    W     = 0222
+    R     = 0444
+    X     = 0111
+    RWX   = R | W | X
+    RX    = R | X
+    RW    = R | W
   end
 
   class FileSystem

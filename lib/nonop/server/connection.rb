@@ -70,13 +70,13 @@ module NonoP::Server
       send(handler, pkt)
     rescue SG::PackedStruct::NoDataError, Errno::ECONNRESET
       if io.eof?
-        puts("Closed #{io}")
+        puts("Closed #{self}")
       else
-        $stderr.puts("Error on #{io}: #{$!.message}")
+        $stderr.puts("Error on #{self}: #{$!.message}")
       end
       close
     rescue
-      $stderr.puts("Error on #{io}: #{$!.message}")
+      $stderr.puts("Error on #{self}: #{$!.message}")
       NonoP.vputs { $!.backtrace.join("\n") }
       reply_to(pkt, NonoP::L2000::Rerror.new($!))
       close
@@ -231,7 +231,7 @@ module NonoP::Server
 
     def on_readdir pkt
       stream = @open_fids.fetch(pkt.data.fid)
-      NonoP.vputs { "Reading dir #{pkt.data.fid} #{stream.inspect}" }
+      NonoP.vputs { "Reading dir #{pkt.data.fid}" }
       ents = stream.readdir(pkt.data.count, pkt.data.offset).
         each.with_index.
         collect { NonoP::L2000::Rreaddir::Dirent.new(qid: _1.qid,
