@@ -96,7 +96,7 @@ def read_fn file, offset, length, block_size, &blk
     file.read(block_size, offset: offset) do |data|
       raise data if StandardError === data # todo where is it handled?
       blk.call(data)
-      cc.call(data.blank?, offset + data.bytesize) do |offset|
+      cc.call(data == nil || data.empty?, offset + data.bytesize) do |offset|
         # Close the file
         file.close
         # Continue on

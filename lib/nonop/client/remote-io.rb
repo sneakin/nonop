@@ -59,7 +59,7 @@ module NonoP
       block_size = client.max_datalen
       slices = NonoP.block_string(data, block_size, length: length)
       results = Async.reduce(slices, 0, offset) do |to_send, counter, offset, &cc|
-        if to_send.blank?
+        if to_send == nil || to_send.empty?
           cc.call(true, counter, offset, &blk)
           next
         end
