@@ -6,8 +6,19 @@ require_relative '../decoder'
 
 module NonoP::Server
   class Connection
-    attr_reader :io, :coder, :input, :output, :environment
+    # @return [IO]
+    attr_reader :io
+    # @return [Decoder]
+    attr_reader :coder
+    # @return [SG::IO::Reactor::Source]
+    attr_reader :input
+    # @return [SG::IO::Reactor::Sink]
+    attr_reader :output
+    # @return [Environment]
+    attr_reader :environment
 
+    # @param io [IO]
+    # @param env [Environment]
     def initialize io, env
       @io = io
       @environment = env
@@ -18,6 +29,7 @@ module NonoP::Server
       env.track_connection(self)
     end
 
+    # @return [String]
     def to_s
       "\#<%s %s:%s>" % [ self.class.name,
                          @io.remote_address.ip_address,
@@ -26,6 +38,7 @@ module NonoP::Server
       super
     end
 
+    # @return [self]
     def close
       return self if closed?
       NonoP.vputs { "Closing #{self} #{closed?}" }
@@ -37,13 +50,16 @@ module NonoP::Server
       self
     end
 
+    # @return [Boolean]
     def closed?
       @closed
     end
 
+    # @return [self]
     def reply_to pkt, msg
       coder.send_one(NonoP::Packet.new(tag: pkt.tag, data: msg),
                      output)
+      self
     rescue SystemCallError
       NonoP.vputs { "Error sending reply: #{$!.message}" }
       close
@@ -64,6 +80,7 @@ module NonoP::Server
       NonoP::L2000::Tsetattr => :on_setattr,
     }
 
+    # @return [self]
     def handle
       pkt = coder.read_one(@io)
       handler = Handlers.fetch(pkt.data.class, :on_unknown)
@@ -82,11 +99,13 @@ module NonoP::Server
       close
     end
 
+    # @return [void]
     def on_version pkt
       reply_to(pkt, NonoP::Rversion.new(msize: coder.max_msglen,
                                         version: NonoP::NString.new(coder.version)))
     end
 
+    # @return [void]
     def on_auth pkt
       if environment.has_user?(pkt.data.n_uname)
         @open_fids[pkt.data.afid] = AuthStream.new(environment, pkt.data.n_uname)
@@ -96,6 +115,7 @@ module NonoP::Server
       end
     end
 
+    # @return [void]
     def on_attach pkt
       # todo the  fid ties the user to the export via fid cloning
       stream = @open_fids.fetch(pkt.data.afid)
@@ -113,6 +133,7 @@ module NonoP::Server
       end
     end
 
+    # @return [void]
     def on_legacy_auth pkt
       fs = environment.get_export(pkt.data.aname.to_s)
 
@@ -136,6 +157,7 @@ module NonoP::Server
     end
 
     # todo async reply
+    # @return [void]
     def on_write pkt
       stream = @open_fids.fetch(pkt.data.fid)
       reply_to(pkt, NonoP::Rwrite.new(count: stream.write(pkt.data.data, pkt.data.offset)))
@@ -146,6 +168,7 @@ module NonoP::Server
     end
 
     # todo async reply
+    # @return [void]
     def on_read pkt
       stream = @open_fids.fetch(pkt.data.fid)
       reply_to(pkt, NonoP::Rread.new(data: stream.read(pkt.data.count, pkt.data.offset) || ''))
@@ -155,6 +178,7 @@ module NonoP::Server
       reply_to(pkt, NonoP::L2000::Rerror.new($!))
     end
 
+    # @return [void]
     def on_clunk pkt
       if stream = @open_fids.delete(pkt.data.fid)
         stream.close
@@ -164,6 +188,7 @@ module NonoP::Server
       end
     end
 
+    # @return [void]
     def on_walk pkt
       # Empty list needs to make a new fid
       stream = @open_fids.fetch(pkt.data.fid)
@@ -182,6 +207,7 @@ module NonoP::Server
       reply_to(pkt, NonoP::L2000::Rerror.new($!))
     end
 
+    # @return [void]
     def on_open pkt
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Opening #{pkt.data.fid} #{stream.qid.inspect}" }
@@ -196,6 +222,7 @@ module NonoP::Server
       end
     end
 
+    # @return [void]
     def on_create pkt
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Creating #{pkt.data.fid} #{stream.qid.inspect}" }
@@ -225,10 +252,13 @@ module NonoP::Server
       h
     end
 
+    # @param qid [Qid]
+    # @return [Integer]
     def map_qid_to_dirent_type qid
       QidDirentMap.fetch(qid.type)
     end
 
+    # @return [void]
     def on_readdir pkt
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Reading dir #{pkt.data.fid}" }
@@ -245,6 +275,7 @@ module NonoP::Server
       reply_to(pkt, NonoP::L2000::Rerror.new($!))
     end
 
+    # @return [void]
     def on_getattr pkt
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Getattr #{pkt.data.fid}" }
@@ -257,6 +288,7 @@ module NonoP::Server
       reply_to(pkt, NonoP::L2000::Rerror.new($!))
     end
 
+    # @return [void]
     def on_setattr pkt
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Setattr #{pkt.data.fid}" }
@@ -269,6 +301,7 @@ module NonoP::Server
       reply_to(pkt, NonoP::L2000::Rerror.new($!))
     end
 
+    # @return [void]
     def on_unknown pkt
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::ENOTSUP))
     end
