@@ -210,15 +210,16 @@ module NonoP::Server
     # @return [void]
     def on_open pkt
       stream = @open_fids.fetch(pkt.data.fid)
-      NonoP.vputs { "Opening #{pkt.data.fid} #{stream.qid.inspect}" }
+      NonoP.vputs { "Opening #{pkt.data.fid} #{stream.class} #{stream.qid.inspect}" }
       begin
-        stream.open(pkt.data.flags)
+        stream.open(NonoP::L2000::Topen::FlagField.new(pkt.data.flags))
         reply_to(pkt, NonoP::Ropen.new(qid: stream.qid || stream.fs.qid,
                                        iounit: 0))
       rescue KeyError
         reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
       rescue SystemCallError
         reply_to(pkt, NonoP::L2000::Rerror.new($!))
+        NonoP.vputs { [ "Error: #{$!.message}", *$!.backtrace ] }
       end
     end
 
@@ -227,7 +228,10 @@ module NonoP::Server
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Creating #{pkt.data.fid} #{stream.qid.inspect}" }
       begin
-        stream.create(pkt.data.name.to_s, pkt.data.flags, pkt.data.mode, pkt.data.gid)
+        stream.create(pkt.data.name.to_s,
+                      NonoP::L2000::Topen::FlagField.new(pkt.data.flags),
+                      NonoP::PermMode.new(pkt.data.mode),
+                      pkt.data.gid)
         reply_to(pkt, NonoP::Rcreate.new(qid: stream.qid || stream.fs.qid,
                                          iounit: 0))
       rescue KeyError
@@ -280,7 +284,7 @@ module NonoP::Server
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Getattr #{pkt.data.fid}" }
       stats = stream.getattr(pkt.data.request_mask)
-      NonoP.vputs { "   #{stats.inspect}" }
+      NonoP.vputs { "   => #{stats.inspect}" }
       reply_to(pkt, NonoP::L2000::Rgetattr.new(**stats))
     rescue KeyError
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))

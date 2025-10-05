@@ -21,6 +21,7 @@ module NonoP::Server
 
         # @param entry [StaticEntry]
         def initialize entry
+          super()
           @entry = entry
         end
 
@@ -84,22 +85,30 @@ module NonoP::Server
 
         delegate :path, to: :entry
 
+        def appending?
+          super || path.pipe?
+        end
+        
         # @param p9_mode [Integer]
         # @return [self]
         # @raise SystemCallError
         def open p9_mode
           return self if @io
+          NonoP.vputs { "Opening #{self} #{path} #{p9_mode}" }
 
-          raise Errno::ENOTSUP if (!@writeable && (0 != (p9_mode & NonoP::L2000::Topen::Mask[:MODE])))
-          raise Errno::ENOENT if @writeable && (0 == (p9_mode & NonoP::L2000::Topen::Flags[:CREATE])) && !path.exist?
+          raise Errno::ENOTSUP if (!@writeable && (0 != (p9_mode.value & NonoP::L2000::Topen::Mask[:MODE])))
+          raise Errno::ENOENT if @writeable && (p9_mode & :CREATE) && !path.exist?
           # todo full mapping
-          mode = case p9_mode & NonoP::L2000::Topen::Mask[:MODE]
+          mode = case p9_mode.value & NonoP::L2000::Topen::Mask[:MODE]
                  when NonoP::L2000::Topen::Flags[:RDONLY] then 'rb'
                  when NonoP::L2000::Topen::Flags[:WRONLY] then 'wb'
                  when NonoP::L2000::Topen::Flags[:RDWR] then 'rb+'
                  else 'rb'
                  end
-          mode[0] = 'a' if 0 != (p9_mode & NonoP::L2000::Topen::Flags[:APPEND])
+          mode[0] = 'a' if (p9_mode & :APPEND) || path.pipe?
+          mode[2] = '+' if path.pipe?
+          NonoP.vputs { "   mode #{mode}" }
+          
           @io = path.open(mode)
           super
         end
@@ -132,9 +141,22 @@ module NonoP::Server
         # @param offset [Integer]
         # @return [String]
         # @raise SystemCallError
-        def read count, offset = 0
-          io.seek(offset)
-          io.read(count)
+        def read count, offset = 0, &cb
+          # fixme deadlock on pipes, the open may be the blocker
+          # fixme unable to seek fifos
+          SG::IO::Reactor::BasicInput.read(io) do
+            NonoP.vputs { "Reading #{count}@#{offset} From #{io}" }
+            io.seek(offset) unless appending?
+            io.read_nonblock(count).tap { cb&.call(_1) }
+          rescue EOFError
+            cb.call('')
+          rescue
+            if cb
+              cb.err!($!)
+            else
+              raise
+            end
+          end
         end
 
         # @param data [String]
@@ -190,7 +212,6 @@ module NonoP::Server
       # @return [OpenedEntry]
       def open p9_mode
         data = DataProvider.new(self, @writeable)
-        data.open(p9_mode)
         super(p9_mode, data)
       end
 
@@ -248,7 +269,7 @@ module NonoP::Server
           data_version: 0,
           dev: stat.dev,
           ino: stat.ino,
-          mode: stat.mode & ~(@writeable ? 0 : PermMode::W),
+          mode: stat.mode & ~(@writeable ? 0 : NonoP::PermMode[:W]),
           nlink: stat.nlink,
           uid: stat.uid,
           gid: stat.gid,
@@ -285,6 +306,7 @@ module NonoP::Server
 
         # @param entry [BufferEntry]
         def initialize entry
+          super()
           @entry = entry
         end
       end
@@ -310,7 +332,7 @@ module NonoP::Server
       # @raise SystemCallError
       def open flags
         oe = super(flags, DataProvider.new(self))
-        if 0 != (flags & (NonoP::L2000::Topen::Flags[:CREATE] || NonoP::L2000::Topen::Flags[:TRUNC]))
+        if flags & [:CREATE, :TRUNC]
           oe.truncate
         end
         oe
@@ -352,7 +374,7 @@ module NonoP::Server
       def attrs
         @attrs ||= FileSystem::DEFAULT_FILE_ATTRS.
           merge(qid: qid,
-                mode: PermMode::FILE | ((data.frozen? ? PermMode::R : PermMode::RW) & ~umask))
+                mode: NonoP::PermMode.new(data.frozen? ? :R : :RW).mask!(~umask) | :FILE)
       end
 
       # @param new_attrs [Hash<Symbol, Object>]
@@ -409,6 +431,7 @@ module NonoP::Server
 
         # @param entry [BufferEntry]
         def initialize entry
+          super()
           @entry = entry
         end
       end
@@ -482,7 +505,7 @@ module NonoP::Server
       def attrs
         @attrs ||= FileSystem::DEFAULT_FILE_ATTRS.
           merge(qid: qid,
-                mode: PermMode::FIFO | (PermMode::RW & ~umask))
+                mode: NonoP::PermMode.new(:RW).mask!(~umask) | :FIFO)
       end
 
       # @param new_attrs [Hash<Symbol, Object>]
@@ -585,7 +608,7 @@ module NonoP::Server
         FileSystem::DEFAULT_DIR_ATTRS.
           merge(qid: qid,
                 size: @entries.size,
-                mode: PermMode::DIR | ((writeable?? PermMode::RWX : PermMode::RX) & ~umask),
+                mode: NonoP::PermMode.new(writeable? ? :RWX : :RX).mask!(~umask) | :DIR,
                 blocks: @entries.empty?? 0 : (1 + @entries.size / FileSystem::BLOCK_SIZE))
       end
 
@@ -599,8 +622,9 @@ module NonoP::Server
         ent = @entries[name] = BufferEntry.new(name, '', umask: umask)
         attrs = {}
         attrs[:gid] = gid if gid
-        attrs[:mode] = PermMode::FILE | (mode & ~umask) if mode
+        attrs[:mode] = NonoP::PermMode.new(mode).mask!(~umask) | :FILE if mode
         ent.setattr(attrs) unless attrs.empty?
+        NonoP.vputs { "Create #{name} #{mode}" }
         ent.open(flags)
       end
     end
@@ -623,7 +647,7 @@ module NonoP::Server
       def initialize path, entry, open_flags: nil, backend: nil
         @path = path
         @entry = entry
-        @open_flags = open_flags
+        @open_flags = NonoP::L2000::Topen::FlagField.new(open_flags)
         @backend = backend
       end
 
@@ -634,16 +658,13 @@ module NonoP::Server
 
       # @return [Boolean]
       def reading?
-        m = open_flags & NonoP::L2000::Topen::Mask[:MODE]
-        m == NonoP::L2000::Topen::Flags[:RDONLY] ||
-          m == NonoP::L2000::Topen::Flags[:RDWR]
+        (0 == (open_flags.mask(NonoP::L2000::Topen::Mask[:MODE])) ||
+         (open_flags & :RDWR))
       end
 
       # @return [Boolean]
       def writing?
-        m = open_flags & NonoP::L2000::Topen::Mask[:MODE]
-        m == NonoP::L2000::Topen::Flags[:WRONLY] ||
-          m == NonoP::L2000::Topen::Flags[:RDWR]
+        (open_flags & [ :WRONLY, :RDWR, :APPEND ])
       end
 
       # @return [self]
@@ -686,8 +707,8 @@ module NonoP::Server
 
     # @param entries [Hash<String, Object>, nil]
     # @param umask [Integer, nil]
-    def initialize root: nil, entries: nil, umask: nil
-      @root = root || DirectoryEntry.new('/', entries: entries, umask: umask, root: true)
+    def initialize root: nil, entries: nil, umask: nil, writeable: false
+      @root = root || DirectoryEntry.new('/', entries: entries, umask: umask, root: true, writeable: writeable)
       @next_id = 0
       @fsids = {}
     end
@@ -704,7 +725,7 @@ module NonoP::Server
     # @param flags [Integer]
     # @return [Integer]
     def open fsid, flags
-      NonoP.vputs { "Opening #{fsid} #{fsids[fsid]}" }
+      NonoP.vputs { "Open #{fsid} #{fsids[fsid]}" }
       id_data = fsids.fetch(fsid)
       id_data.open(flags)
       fsid
@@ -794,6 +815,7 @@ module NonoP::Server
     # @raise KeyError
     def readdir fsid, count, offset = 0
       id_data = fsids.fetch(fsid)
+      NonoP.vputs { "readdir #{fsid} #{id_data.open_flags}" }
       raise Errno::EACCES unless id_data.reading?
       id_data.readdir(count, offset)
     rescue KeyError
@@ -833,7 +855,7 @@ module NonoP::Server
     # @raise SystemCallError
     # @raise KeyError
     def getattr fsid
-      NonoP.vputs { "GetAttr #{fsid} #{fsids[fsid].inspect}" }
+      NonoP.vputs { "GetAttr #{fsid} #{fsids.has_key?(fsid)}" }
       fsids.fetch(fsid).getattr
     rescue KeyError
       if fsid == 0

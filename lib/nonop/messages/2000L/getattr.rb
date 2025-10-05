@@ -4,6 +4,7 @@ using SG::Ext
 require_relative '../packet-data'
 require_relative '../../qid'
 require_relative '../../time_t'
+require_relative '../../perm-mode'
 
 module NonoP
   module L2000
@@ -37,7 +38,7 @@ module NonoP
       include Packet::Data
       define_packing([ :valid, :uint64l ],
                      [ :qid, Qid ],
-                     [ :mode, :uint32l ],
+                     [ :nmode, :uint32l ],
                      [ :uid, :uint32l ],
                      [ :gid, :uint32l ],
                      [ :nlink, :uint64l ],
@@ -55,6 +56,17 @@ module NonoP
                      [ :btime_nsec, :uint64l ],
                      [ :gen, :uint64l ],
                      [ :data_version, :uint64l ])
+
+      calc_attr :nmode, lambda { mode.to_i }
+      attributes :mode
+
+      def mode
+        @mode ||= NonoP::PermMode.new(nmode)
+      end
+      def mode= v
+        @mode = v
+      end
+      
       def atime_sec= t
         key = Integer === t ? :n : :t
         @atime_sec = TimeT.new(key => t)

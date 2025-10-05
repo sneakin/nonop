@@ -3,6 +3,7 @@ using SG::Ext
 
 require_relative '../packet-data'
 require_relative '../../qid'
+require_relative '../../bit-field'
 
 module NonoP
   module L2000
@@ -33,21 +34,22 @@ module NonoP
         OPTS: 0xFFFFFFF0,
       }
 
+      FlagField = BitField.new(Flags, Mask, 'FlagField')
+      
       # size[4] Tlopen tag[2] fid[4] flags[4]
       include Packet::Data
       define_packing([:fid, :uint32l],
-                     [:flags, :uint32l])
+                     [:nflags, :uint32l])
+      attributes :flags
+      calc_attr :nflags, lambda { flags.to_i }
 
-      def flags= v
-        @flags = self.class.flag_mask(v)
+      def nflags= v
+        @nflags = v
+        self.flags = v
       end
-
-      def self.flag_mask v
-        case v
-        when Array then v.reduce(0) { _1 | Flags[_2] }
-        when Symbol then Flags[v]
-        else v
-        end
+      
+      def flags= v
+        @flags = FlagField.new(v)
       end
     end
 

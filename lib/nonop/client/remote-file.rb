@@ -13,7 +13,7 @@ module NonoP
     def initialize path, attachment:, flags: nil, fid: nil, mode: nil, gid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
-      @flags = L2000::Topen.flag_mask(flags || [:RDONLY])
+      @flags = L2000::Topen::FlagField.new(flags || :RDONLY)
       @fid = fid || client.next_fid
       @io = RemoteIO.new(client, @fid, path)
       open(mode: mode, gid: gid, &blk)
@@ -33,7 +33,7 @@ module NonoP
         when Rwalk then
           if pkt.nwqid < @path.size
             client.clunk(@fid)
-            if 0 != (@flags & NonoP::L2000::Topen::Flags[:CREATE])
+            if @flags & :CREATE
               create(mode: mode, gid: gid, &blk)
             else
               blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))

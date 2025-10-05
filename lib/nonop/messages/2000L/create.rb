@@ -10,10 +10,20 @@ module NonoP
       include Packet::Data
       define_packing([:fid, :uint32l],
                      [:name, NString ],
-                     [:flags, :uint32l],
+                     [:nflags, :uint32l],
                      [:mode, :uint32l],
                      [:gid, :uint32l])
+      attributes :flags
+      calc_attr :nflags, lambda { flags.to_i }
 
+      def nflags= v
+        @nflags = v
+        self.flags = v
+      end
+      
+      def flags= v
+        @flags = NonoP::L2000::Topen::FlagField.new(v)
+      end
     end
 
     class Rcreate

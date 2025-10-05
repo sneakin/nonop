@@ -14,7 +14,7 @@ module NonoP
     def initialize path, attachment:, flags: nil, fid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
-      @flags = flags || NonoP::L2000::Topen::Flags[:DIRECTORY]
+      @flags = NonoP::L2000::Topen::FlagField.new(flags || :DIRECTORY)
       @fid = fid || client.next_fid
       open_self(&blk)
     end
