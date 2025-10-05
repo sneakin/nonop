@@ -1,0 +1,32 @@
+* Features
+** Version/auth decoder: only accepts those packets and upgrades the decoder
+** Per export auth
+** Separate client and server decoders: client rejects T messages, server rejects R messages
+** Docs
+*** README
+** Development enviroment
+*** Rakefile
+**** Rpec
+**** YARD
+** Tests
+*** Mkdir
+*** cat & put: Bigger files
+** Operation support
+*** Surveying what ops are needed
+*** Writing
+*** Deleting
+**** Files
+**** Directories
+*** Links
+*** xattrs
+*** Pipes
+*** Devices
+*** Generated table of support and testing state
+** EasyFS integration: FUSE and 9p file systems.
+** Benchmarks & standard file system tests
+** File system quirk hiding
+*** Temporary files for saves
+
+* Bugs
+** Deadlock when exporting itself in the file system.
+** Fifos
