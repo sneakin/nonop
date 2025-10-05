@@ -44,7 +44,7 @@ module NonoP::Server
         @data = data
       end
 
-      # @param p9_mode [Integer]
+      # @param p9_mode [NonoP::BitField::Instance]
       # @return [OpenedEntry]
       # @raise SystemCallError
       def open p9_mode
@@ -86,11 +86,12 @@ module NonoP::Server
 
         delegate :path, to: :entry
 
+        # @return [Boolean]
         def appending?
           super || path.pipe?
         end
         
-        # @param p9_mode [Integer]
+        # @param p9_mode [NonoP::BitField::Instance]
         # @return [self]
         # @raise SystemCallError
         def open p9_mode
@@ -209,7 +210,7 @@ module NonoP::Server
         end
       end
 
-      # @param p9_mode [Integer]
+      # @param p9_mode [NonoP::BitField::Instance]
       # @return [OpenedEntry]
       def open p9_mode
         data = DataProvider.new(self, @writeable)
@@ -242,12 +243,14 @@ module NonoP::Server
         end
       end
 
+      # @return [Boolean]
       def directory?
         path.directory?
       end
             
-      def fifo?
-        path.directory?
+      # @return [Boolean]
+      def pipe?
+        path.pipe?
       end
             
       # @param count [Integer]
@@ -328,7 +331,7 @@ module NonoP::Server
         data.bytesize
       end
 
-      # @param flags [Integer]
+      # @param flags [NonoP::BitField::Instance]
       # @return [OpenedEntry]
       # @raise SystemCallError
       def open flags
@@ -422,7 +425,7 @@ module NonoP::Server
       # @yieldparam offset [Integer, nil]
       # @yieldreturn [String] The new file contents.
       def initialize name, umask: nil, &blk
-        super(name, blk.call(self), umask:)
+        super(name, umask:)
         @cb = blk
       end
 
@@ -462,11 +465,11 @@ module NonoP::Server
       end
       
       # @return [Boolean]
-      def fifo?
+      def pipe?
         true
       end
 
-      # @param flags [Integer]
+      # @param flags [NonoP::BitField::Instance]
       # @return [OpenedEntry]
       # @raise SystemCallError
       def open flags
@@ -543,7 +546,7 @@ module NonoP::Server
       attr_reader :entries
 
       # @param name [String]
-      # @param entries [Hash<String, Object>]
+      # @param entries [Hash<String, Object>, nil]
       # @param root [Boolean]
       # @param umask [Integer, nil]
       # @param writeable [Boolean]
@@ -585,7 +588,7 @@ module NonoP::Server
         true
       end
 
-      # @param p9_mode [Integer]
+      # @param p9_mode [NonoP::BitField::Instance]
       # @return [OpenedEntry]
       # @raise SystemCallError
       def open p9_mode
@@ -670,6 +673,7 @@ module NonoP::Server
         (open_flags & [ :WRONLY, :RDWR, :APPEND ])
       end
 
+      # @param flags [NonoP::BitField::Instance]
       # @return [self]
       def open flags
         @open_flags = flags
@@ -708,8 +712,10 @@ module NonoP::Server
     # @return [Hash<Integer, FSID>]
     attr_reader :fsids
 
+    # @param root [DirectoryEntry, PathEntry, nil]
     # @param entries [Hash<String, Object>, nil]
     # @param umask [Integer, nil]
+    # @param writeable [Boolean]
     def initialize root: nil, entries: nil, umask: nil, writeable: false
       @root = root || DirectoryEntry.new('/', entries: entries, umask: umask, root: true, writeable: writeable)
       @next_id = 0
@@ -725,7 +731,7 @@ module NonoP::Server
     end
 
     # @param fsid [Integer]
-    # @param flags [Integer]
+    # @param flags [NonoP::BitField::Instance]
     # @return [Integer]
     def open fsid, flags
       NonoP.vputs { "Open #{fsid} #{fsids[fsid]}" }

@@ -39,7 +39,7 @@ module NonoP
         def self.for_entry entry, n
           type = case entry
           when :directory? then DirentTypes[:DIR]
-          when :fifo? then DirentTypes[:FIFO]
+          when :pipe? then DirentTypes[:FIFO]
           else DirentTypes[:REG]
           end
           self.new(qid: entry.qid,

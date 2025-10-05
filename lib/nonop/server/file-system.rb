@@ -51,12 +51,13 @@ module NonoP::Server
              (mode & [ :RDONLY, :RDWR ]))
         end
 
+        # @return [Boolean]
         def appending?
           (nil != mode) && (mode & :APPEND)
         end
                 
         # @abstract
-        # @param mode [Integer]
+        # @param mode [Integer. NonoP::BitField::Instance]
         # @return [self]
         # @raise SystemCallError
         def open mode
@@ -142,12 +143,12 @@ module NonoP::Server
 
       # @abstract
       # @return [Boolean]
-      def fifo?
+      def pipe?
         false
       end
         
       # @abstract
-      # @param p9_mode [Integer]
+      # @param p9_mode [NonoP::BitField::Instance]
       # @param data [DataProvider, nil]
       # @return [OpenedEntry]
       # @raise SystemCallError
@@ -207,7 +208,6 @@ module NonoP::Server
       attr_reader :data
 
       # @param entry [Entry]
-      # @param mode [Integer]
       # @param data [Entry::DataProvider]
       def initialize entry, data
         @entry = entry
