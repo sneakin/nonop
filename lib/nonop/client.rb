@@ -105,6 +105,7 @@ module NonoP
     def close
       close_fids
       @io.close
+      stop!
     end
 
     def close_fids

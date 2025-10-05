@@ -11,7 +11,7 @@ require 'optparse'
 
 require 'sg/io/reactor'
 
-$verbose = false
+$verbose = ENV['VERBOSE'].to_bool
 listen_on = nil
 port = 562
 auth_db_path = nil
@@ -49,10 +49,10 @@ opts = OptionParser.new do |o|
   o.on('--timeout SECS') do |v|
     reactor_timeout = v.to_i
   end
-  o.on('-e', '--export NAME:PATH') do |v|
-    name, path = v.split(':')
+  o.on('-e', '--export NAME:PATH:RW') do |v|
+    name, path, mode = v.split(':')
     raise ArgumentError.new("Export must be NAME:PATH.") if name.blank? || path.blank?
-    exports[name] = Pathname.new(path)
+    exports[name] = [ Pathname.new(path), mode&.downcase == 'rw' ]
   end
 end
 args = opts.parse(ARGV)
@@ -117,9 +117,9 @@ ctlfs = NonoP::Server::HashFileSystem.
       })
 srvenv.export('ctl', ctlfs)
 
-exports.each do |name, path|
+exports.each do |name, (path, writeable)|
   fs = if path.directory?
-         root = NonoP::Server::HashFileSystem::PathEntry.new('/', path)
+         root = NonoP::Server::HashFileSystem::PathEntry.new('/', path, writeable: writeable)
          NonoP::Server::HashFileSystem.new(umask: default_umask,
                                            root: root)
        elsif path.to_s =~ /\.(rb|nonofs)\Z/

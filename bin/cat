@@ -70,11 +70,11 @@ sock = TCPSocket.new(host, port)
 coder = NonoP.coder_for(coder)
 client = NonoP::Client.new(coder: coder, io: sock)
 
-Signal.trap('INT') do
-  client.close
-end
-Signal.trap('QUIT') do
-  client.close
+%w{INT QUIT}.each do |sig|
+  Signal.trap(sig) do
+    NonoP.vputs("Goodbye.")
+    client.close
+  end
 end
 
 def parse_path path
