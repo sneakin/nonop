@@ -34,9 +34,6 @@ module NonoP::Server
 
     def untrack_connection conn
       @connections.delete(conn)
-      # fixme ideally the reactor does this
-      reactor.del_input(conn.input)
-      reactor.del_output(conn.output)
       self
     end
 

@@ -42,6 +42,7 @@ module NonoP::Server
     def close
       return self if closed?
       NonoP.vputs { "Closing #{self} #{closed?}" }
+      @input.close
       @output.close
       self
     ensure
@@ -244,6 +245,7 @@ module NonoP::Server
         reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
       rescue SystemCallError
         reply_to(pkt, NonoP::L2000::Rerror.new($!))
+        NonoP.vputs { [$!.to_s, *$!.backtrace ] }
       end
     end
 
