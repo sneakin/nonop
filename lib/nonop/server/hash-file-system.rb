@@ -29,7 +29,8 @@ module NonoP::Server
         # @param offset [Integer]
         # @return [String]
         # @raise SystemCallError
-        def read count, offset = 0
+        def read count, offset = 0, &cb
+          return cb.call(read(count, offset)) if cb
           entry.attrs[:atime_sec] = Time.now
           entry.data[offset, count]
         end
@@ -164,7 +165,7 @@ module NonoP::Server
         # @return [Integer]
         # @raise SystemCallError
         def write data, offset = 0
-          io.seek(offset)
+          io.seek(offset) unless appending?
           io.write(data)
         end
 
@@ -342,7 +343,8 @@ module NonoP::Server
       # @param offset [Integer]
       # @return [String]
       # @raise SystemCallError
-      def read count, offset = 0
+      def read count, offset = 0, &cb
+        return cb.call(read(count, offset)) if cb
         attrs[:atime_sec] = Time.now
         data[offset, count]
       end
@@ -475,7 +477,8 @@ module NonoP::Server
       # @param offset [Integer]
       # @return [String]
       # @raise SystemCallError
-      def read count, offset = 0
+      def read count, offset = 0, &cb
+        return cb.call(count, offset) if cb
         return '' if data.empty?
         attrs[:atime_sec] = Time.now
         data.shift[0, count]
@@ -828,10 +831,10 @@ module NonoP::Server
     # @return [String]
     # @raise SystemCallError
     # @raise KeyError
-    def read fsid, count, offset = 0
+    def read fsid, count, offset = 0, &cb
       id_data = fsids.fetch(fsid)
       raise Errno::EACCES unless id_data.reading?
-      id_data.read(count, offset)
+      id_data.read(count, offset, &cb)
     rescue KeyError
       raise Errno::EBADFD
     end

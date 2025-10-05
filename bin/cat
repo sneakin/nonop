@@ -94,9 +94,10 @@ def read_fn file, offset, length, block_size, &blk
   NonoP::Async.reduce(Range.new(offset, offset + length).step(block_size),
                       offset) do |count, offset, &cc|
     file.read(block_size, offset: offset) do |data|
+      NonoP.vputs { "Received #{data.class} #{data.to_s.size}" }
       raise data if StandardError === data # todo where is it handled?
       blk.call(data)
-      cc.call(data == nil || data.empty?, offset + data.bytesize) do |offset|
+      cc.call(data == nil || data.empty?, offset + data.bytesize) do |status, offset|
         # Close the file
         file.close
         # Continue on
@@ -115,7 +116,7 @@ client.start do |pkt|
         path, max_count, offset = parse_path(path)
         NonoP.vputs { "Reading path #{path} #{max_count} #{offset}" }
         attachment.open(path, flags: [:RDONLY]) do |file|
-          fin = lambda do |final_count|
+          fin = lambda do |status, final_count|
             NonoP.vputs { paths.zip(final_count).to_a.inspect }
             client.close
             $had_errors = final_count.any? { RuntimeError === _1  }

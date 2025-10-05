@@ -82,9 +82,11 @@ module NonoP::Server
         # @abstract
         # @param count [Integer]
         # @param offset [Integer]
+        # @yield [void]
+        # @yieldreturn [String] Read data
         # @return [String]
         # @raise SystemCallError
-        def read count, offset = 0
+        def read count, offset = 0, &cb
           raise Errno::ENOTSUP
         end
 
@@ -298,7 +300,7 @@ module NonoP::Server
     # @return [String]
     # @raise SystemCallError
     # @raise KeyError
-    def read fsid, count, offset = 0
+    def read fsid, count, offset = 0, &cb
       raise Errno::ENOTSUP
     end
 

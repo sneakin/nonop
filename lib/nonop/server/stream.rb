@@ -56,7 +56,7 @@ module NonoP::Server
     # @param offset [Integer]
     # @return [String]
     # @raise SystemCallError
-    def read count, offset = 0
+    def read count, offset = 0, &cb
       raise Errno::ENOTSUP
     end
 

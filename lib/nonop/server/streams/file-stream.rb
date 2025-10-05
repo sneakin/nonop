@@ -77,8 +77,8 @@ module NonoP::Server
     # @param offset [Integer]
     # @return [String]
     # @raise SystemCallError
-    def read count, offset = 0
-      fs.read(fsid, count, offset)
+    def read count, offset = 0, &cb
+      fs.read(fsid, count, offset, &cb)
     end
 
     # @param data [String]

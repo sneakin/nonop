@@ -112,18 +112,23 @@ client.start do |pkt|
       attachment.open(paths[0], gid: gid, flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
         raise file if StandardError === file
 
-        doner = lambda do |*state|
-          NonoP.vputs("ALL DONE")
+        doner = lambda do |status, count, offset, err|
           client.close
+          if StandardError === status
+            $stderr.puts("Error #{status.message}", *status.backtrace)
+            exit(-1) if err
+          else
+            NonoP.vputs("ALL DONE")
+          end
         end
 
-        NonoP::Async.reduce(reader, 0, write_offset) do |data_block, count, offset, &cc|
+        NonoP::Async.reduce(reader, 0, write_offset, false) do |data_block, count, offset, err, &cc|
           NonoP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
           file.write(data_block, offset: offset) do |reply|
             if nil == reply
-              cc.call(true, count, offset, &doner)
+              cc.call(true, count, offset, false, &doner)
             elsif StandardError === reply
-              cc.call(reply, count, offset, &doner)
+              cc.call(reply, count, offset, true, &doner)
             else
               if data_block.bytesize < block_size
                 file.close
@@ -131,7 +136,8 @@ client.start do |pkt|
 
               cc.call(data_block.bytesize < block_size,
                       count + reply,
-                      offset + reply, &doner)
+                      offset + reply,
+                      reply < data_block.size, &doner)
             end
           end
         end

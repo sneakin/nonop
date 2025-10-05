@@ -22,10 +22,10 @@ describe NonoP::Async do
     end
 
     it 'calls the continuation block once at the end' do
-      en = test_data.each
       fin_calls = 0
       r = NonoP::Async.reduce(test_data, []) do |el, acc, &cc|
-        cc.call(el == 3, acc + [ el * el ]) do |facc|
+        cc.call(el == 3, acc + [ el * el ]) do |done, facc|
+          expect(done).to be(true)
           expect(facc).to eql([1,4,9])
           fin_calls += 1
           :done
@@ -36,32 +36,50 @@ describe NonoP::Async do
     end
 
     it 'is interruptible' do
-      en = test_data.each
       delayed_fn = nil
       final_acc = nil
       r = NonoP::Async.reduce(test_data, []) do |el, acc, &cc|
         if el == 1
-          delayed_fn = lambda do
-            cc.call(el == 3, acc + [ el * el ]) do |acc|
-              puts :madeit
+          # short circuit on the second element
+          break delayed_fn = lambda do
+            cc.call(el == 3, acc + [ el * el ]) do |done, acc|
               final_acc = acc
               expect(acc).to eql([1,4,9])
               break :here
             end
           end
-          break :b
         else
-          puts :cont
-          cc.call(false, acc + [ el * el ])
+          cc.call(false, acc + [ el * el ]) do |done, acc|
+            final_acc = acc
+            expect(acc).to eql([1,4,9,16]) #el.times.collect { (_1 + 1) ** 2 })
+            :there
+          end
         end
-        "post-#{el}"
+        # "post-#{el}"
       end
       expect(final_acc).to eql(nil)
-      expect(r).to be(:b)
+      expect(r).to be(delayed_fn)
+      expect(delayed_fn).to be_kind_of(Proc)
+      r = delayed_fn.call # will loop until the end
+      expect(r).to be(:there)
+      expect(final_acc).to eql([1,4,9,16])
+    end
+
+    it 'is interruptible w/ less magic' do
+      delayed_fn = nil
+      r = NonoP::Async.reduce(test_data, []) do |el, acc, &cc|
+        if el == 1
+          delayed_fn = lambda do
+            cc.call(el == 3, acc + [ el * el ])
+          end
+        else
+          cc.call(false, acc + [ el * el ])
+        end
+      end
+      expect(r).to be(delayed_fn)
       expect(delayed_fn).to be_kind_of(Proc)
       r = delayed_fn.call
-      expect(r).to eql(:here)
-      expect(final_acc).to eql([1,4,9])
+      expect(r).to eql([[1,4,9,16]])
     end
   end
 end

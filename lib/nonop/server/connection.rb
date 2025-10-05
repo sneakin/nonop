@@ -89,14 +89,15 @@ module NonoP::Server
       if io.eof?
         puts("Closed #{self}")
       else
-        $stderr.puts("Error on #{self}: #{$!.message}")
+        puts("Error on #{self}: #{$!.message}")
       end
       close
     rescue
-      $stderr.puts("Error on #{self}: #{$!.message}")
+      puts("Error on #{self} #{$!.class}: #{$!.message}")
       NonoP.vputs { $!.backtrace.join("\n") }
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADMSG))
-      close
+      #close
+      self
     end
 
     # @return [void]
@@ -171,11 +172,16 @@ module NonoP::Server
     # @return [void]
     def on_read pkt
       stream = @open_fids.fetch(pkt.data.fid)
-      reply_to(pkt, NonoP::Rread.new(data: stream.read(pkt.data.count, pkt.data.offset) || ''))
+      stream.read(pkt.data.count, pkt.data.offset, &lambda do |data|
+                    reply_to(pkt, NonoP::Rread.new(data: data || ''))
+                  end.but!(SystemCallError) do |err| # fixme not catching
+                    NonoP.vputs { "Caught #{$!}" }
+                    reply_to(pkt, NonoP::L2000::Rerror.new(err))
+                  end)
     rescue KeyError
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
     rescue SystemCallError
-      reply_to(pkt, NonoP::L2000::Rerror.new($!))
+      reply_to(pkt, NonoP::L2000::Rerror.new($!))      
     end
 
     # @return [void]

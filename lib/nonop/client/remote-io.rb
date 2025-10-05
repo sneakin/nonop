@@ -65,12 +65,13 @@ module NonoP
         end
 
         write_one(to_send, offset: offset) do |result|
+          doner = lambda { |status, *a, **o, &b| status == true ? blk.call(*a, **o, &b) : blk.call(status, *a, **o, &b) }
           if StandardError === result
-            cc.call(result, counter, offset, &blk)
+            cc.call(result, counter, offset, &doner)
           elsif result.count == to_send.bytesize
-            cc.call(false, counter + result.count, offset + result.count, &blk)
+            cc.call(false, counter + result.count, offset + result.count, &doner)
           else
-            cc.call(true, counter + result.count, offset + result.count, &blk)
+            cc.call(true, counter + result.count, offset + result.count, &doner)
           end
         end
       end
