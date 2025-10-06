@@ -127,7 +127,7 @@ module NonoP::Server
       def qid
         @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:FILE],
                                 version: 0,
-                                path: name.to_s[0, 8])
+                                path: [ hash ].pack('Q'))
       end
 
       # @abstract
@@ -229,7 +229,7 @@ module NonoP::Server
     # @return [Qid]
     def qid
       @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:MOUNT],
-                              version: 0, path: '/')
+                              version: 0, path: [ hash ].pack('Q'))
     end
 
     # @abstract

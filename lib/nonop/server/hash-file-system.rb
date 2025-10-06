@@ -198,7 +198,7 @@ module NonoP::Server
       def qid
         @qid ||= NonoP::Qid.new(type: path.directory? ? NonoP::Qid::Types[:DIR] : NonoP::Qid::Types[:FILE],
                                 version: 0,
-                                path: name.to_s[0, 8])
+                                path: [ hash ].pack('Q'))
       end
       
       # @return [Integer]
@@ -456,7 +456,7 @@ module NonoP::Server
       def qid
         @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:APPEND],
                                 version: 0,
-                                path: name[0, 8])
+                                path: [ hash ].pack('Q'))
       end
       
       # @return [Integer]
@@ -580,7 +580,7 @@ module NonoP::Server
       def qid
         @qid ||= NonoP::Qid.new(type: is_root? ? NonoP::Qid::Types[:MOUNT] : NonoP::Qid::Types[:DIR],
                                 version: 0,
-                                path: name[0, 8])
+                                path: [ hash ].pack('Q'))
       end
       
       # @return [Boolean]
