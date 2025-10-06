@@ -14,6 +14,9 @@ describe 'nonop ls' do
   end
   
   describe 'on a test server' do
+    let(:rm_size) { Pathname.new(__FILE__).parent.parent.parent.join('README.md').size }
+    let(:src_size) { Pathname.new(__FILE__).parent.parent.parent.size }
+
     before :all do
       @server, @started_at = start_server
     end
@@ -59,9 +62,9 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  README.md        289  -r--r-----
-  config             3  dr-xr-x---
-  info               2  dr-xr-x---
+  README.md          #{rm_size}  -r--r-----
+  config             3           dr-xr-x---
+  info               2           dr-xr-x---
 EOT
             end
           end
@@ -71,9 +74,9 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  info               2   dr-xr-x---
-  config             3   dr-xr-x---
-  README.md        289   -r--r-----
+  info               2           dr-xr-x---
+  config             3           dr-xr-x---
+  README.md          #{rm_size}  -r--r-----
 EOT
             end
           end
@@ -138,8 +141,8 @@ EOT
   tmp
   info
   welcome
-  README.md
   src
+  README.md
 EOT
           end
         end
@@ -153,13 +156,13 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  README.md        289   -r--r-----
-  fifo               0   prw-r-----
-  info               2   dr-xr-x---
-  scratch            0   -rw-------
-  src              398   dr-xr-x---
-  tmp                0   drwxr-x---
-  welcome            7   -rw-r-----
+  README.md          #{rm_size}   -r--r-----
+  fifo               0            prw-r-----
+  info               2            dr-xr-x---
+  scratch            0            -rw-------
+  src                #{src_size}  dr-xr-x---
+  tmp                0            drwxr-x---
+  welcome            7            -rw-r-----
 EOT
             end
           end
@@ -169,13 +172,13 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  scratch            0   -rw-------
-  fifo               0   prw-r-----
-  tmp                0   drwxr-x---
-  info               2   dr-xr-x---
-  welcome            7   -rw-r-----
-  README.md        289   -r--r-----
-  src              398   dr-xr-x---
+  scratch            0            -rw-------
+  fifo               0            prw-r-----
+  tmp                0            drwxr-x---
+  info               2            dr-xr-x---
+  welcome            7            -rw-r-----
+  src                #{src_size}  dr-xr-x---
+  README.md          #{rm_size}   -r--r-----
 EOT
             end
           end
