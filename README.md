@@ -71,13 +71,13 @@ Common options include:
 : The `aname` of the export to access.
 
 `-h HOST`, `--host HOST`
-: The hostname to connect. Defaults to `localhost`
+: The hostname to connect. Defaults to `localhost`.
 
 `-p INT`, `--port INT`
-: The port number to connect. Defaults to 562p
+: The port number to connect. Defaults to 562.
 
 `--uname NAME`
-: Your user name. Defoults to `ENV['USER']`
+: Your user name. Defaults to `ENV['USER']`.
 
 `--uid INT`
 : Your user ID. Defaults to `Process.uid`.
