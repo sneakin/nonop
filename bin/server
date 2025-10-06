@@ -101,13 +101,13 @@ ctlfs = NonoP::Server::HashFileSystem.
         },
         'config' => {
           'README' => "Configure the server by writing to these files.\n".freeze,
-          'verbose' => NonoP::Server::HashFileSystem::WriteableEntry.new('verbose') { |entry, data = nil, offset = 0|
+          'verbose' => NonoP::Server::FileSystem::WriteableEntry.new('verbose') { |entry, data = nil, offset = 0|
             if data
               $verbose = entry.data.strip.to_bool
             end
             entry.data = $verbose.to_s + "\n"
           },
-          'done' => NonoP::Server::HashFileSystem::WriteableEntry.new('done') { |entry, data = nil, offset = 0|
+          'done' => NonoP::Server::FileSystem::WriteableEntry.new('done') { |entry, data = nil, offset = 0|
             if data && entry.data.strip.to_bool
               srvenv.done! { reactor.done! }
             end
@@ -119,7 +119,7 @@ srvenv.export('ctl', ctlfs)
 
 exports.each do |name, (path, writeable)|
   fs = if path.directory?
-         root = NonoP::Server::HashFileSystem::PathEntry.new('/', path, writeable: writeable)
+         root = NonoP::Server::FileSystem::PathEntry.new('/', path, writeable: writeable)
          NonoP::Server::HashFileSystem.new(umask: default_umask,
                                            root: root)
        elsif path.to_s =~ /\.(rb|nonofs)\Z/
