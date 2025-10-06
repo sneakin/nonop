@@ -91,7 +91,10 @@ Common options include:
 ### Hash Defined
 
 [examples/basic-fs.nonofs](file.basic-fs.html)
+: Exports a couple virtual files.
+
 [spec/spec-fs.nonofs](file.spec-fs.html)
+: Exports at least one of each predefined entry types for testing.
 
 ### Interfaces
 
