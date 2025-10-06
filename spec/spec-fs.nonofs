@@ -1,3 +1,6 @@
+# @markup ruby
+# -*- mode: ruby -*-
+
 require 'tempfile'
 scratch_file = Tempfile.new
 

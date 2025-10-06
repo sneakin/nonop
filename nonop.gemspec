@@ -14,6 +14,7 @@ Gem::Specification.new do |s|
   s.executables = [ 'bin/nonop' ]
   s.require_paths = [ 'lib' ]
   s.add_dependency 'sg'
+  s.add_development_dependency 'org-ruby'
   s.add_dependency 'rdoc'
   s.add_dependency 'rspec'
   s.add_development_dependency 'solargraph'

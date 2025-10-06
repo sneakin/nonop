@@ -1,9 +1,16 @@
 * Features
-** Version/auth decoder: only accepts those packets and upgrades the decoder
+** Namespacing
+*** FlagFields out of Topen
+*** Messages under NonoP::Messages
+** Socket IO
+*** Version/auth decoder: only accepts those packets and upgrades the decoder
+*** Separate client and server decoders: client rejects T messages, server rejects R messages
 ** Per export auth
-** Separate client and server decoders: client rejects T messages, server rejects R messages
 ** Docs
 *** README
+*** Examples
+**** Hash defined w/ in program variables
+**** NonoP::FileSystem subclassing
 ** Development enviroment
 *** Rakefile
 **** Rpec
@@ -20,7 +27,13 @@
 *** Links
 *** xattrs
 *** Pipes
+**** mkfifo
+**** IO
+**** In process virtual pipes
 *** Devices
+**** mknod
+**** Pass throughbof major, minor
+**** Direct IO
 *** Generated table of support and testing state
 ** EasyFS integration: FUSE and 9p file systems.
 ** Benchmarks & standard file system tests
