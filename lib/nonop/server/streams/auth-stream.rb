@@ -18,8 +18,9 @@ module NonoP::Server
     end
 
     def authentic? uname, uid
-      NonoP.vputs { [ "Authenticating #{@user}", @data.inspect, @environment.find_user(@user).inspect ] }
-      (@user == uname || @user == uid) && @environment.auth(@user, @data)
+      NonoP.vputs { [ "Authenticating #{@user} #{uname} #{uid}", @data.inspect, @environment.find_user(@user).inspect ] }
+      (@user == uname || @user == uid) &&
+        @environment.authenticate(@user, @data)
     end
 
     def dup

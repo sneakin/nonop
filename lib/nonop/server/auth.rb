@@ -3,7 +3,7 @@ using SG::Ext
 
 module NonoP::Server
   class AuthService
-    def auth user, creds
+    def authenticate user, creds
       false
     end
     def find_user user
@@ -21,7 +21,7 @@ module NonoP::Server
     def initialize db
       @db = db
     end
-    def auth user, creds
+    def authenticate user, creds
       u = find_user(user)
       u && u[1] == creds.strip
     end
@@ -41,14 +41,14 @@ module NonoP::Server
   end
 
   class YesAuth < AuthHash
-    def auth user, creds
+    def authenticate user, creds
       return false unless has_user?(user)
       true
     end
   end
 
   class MungeAuth < AuthHash
-    def auth user, creds
+    def authenticate user, creds
       return false unless has_user?(user)
       status, meta, payload = Munge.verify do |io|
         io.puts(creds)

@@ -25,7 +25,7 @@ module NonoP::Server
       @exports.fetch(name)
     end
 
-    delegate :auth, :find_user, :has_user?, to: :authsrv
+    delegate :authenticate, :find_user, :has_user?, to: :authsrv
 
     def track_connection conn
       @connections[conn] = conn
