@@ -83,7 +83,7 @@ Common options include:
 : Your user ID. Defaults to `Process.uid`.
 
 `--auth-creds BLOB`
-: The authentication credentials. Defaults to generating credentials wdth Munge.
+: The authentication credentials. Defaults to generating credentials with Munge.
 
 `-n`, `--no-auth`
 : Bypasses all authentication.
