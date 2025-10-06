@@ -27,7 +27,7 @@ describe 'nonop ls' do
 
     describe 'with ctl aname' do
       def run_ls *args, &blk
-        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', 'ctl', *args, &blk)
+        run_nonop('ls', '--host', 'localhost', '--port', NonoP::SpecHelper::PORT.to_s, '--aname', 'ctl', *args, &blk)
       end
       
       describe 'no paths' do
@@ -113,7 +113,7 @@ EOT
 
     describe 'with spec aname' do
       def run_ls *args, &blk
-        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, &blk)
+        run_nonop('ls', '--host', 'localhost', '--port', NonoP::SpecHelper::PORT.to_s, '--aname', 'spec', *args, &blk)
       end
       
       describe 'no paths' do
@@ -212,7 +212,7 @@ EOT
     
     describe 'with aname="basic"' do
       def run_ls *args, &blk
-        run_nonop('ls', '--host', 'localhost', '--port', '10000', '--aname', 'basic', *args, &blk)
+        run_nonop('ls', '--host', 'localhost', '--port', NonoP::SpecHelper::PORT.to_s, '--aname', 'basic', *args, &blk)
       end
       
       describe 'no paths' do
@@ -235,10 +235,10 @@ EOT
     end
 
     it 'a bad host exits w/ an error' do
-      expect { run_ls('--host', 'example.local', '--port', '10000') }.to change { @status&.exitstatus }.to(1)
+      expect { run_ls('--host', 'example.local', '--port', NonoP::SpecHelper::PORT.to_s) }.to change { @status&.exitstatus }.to(1)
     end
     xit 'a bad host exits w/ an error' do
-      expect { run_ls('--host', 'example.com', '--port', '10000') }.to change { @status&.exitstatus }.to(1)
+      expect { run_ls('--host', 'example.com', '--port', NonoP::SpecHelper::PORT.to_s) }.to change { @status&.exitstatus }.to(1)
     end
     it 'a bad port exits w/ an error' do
       expect { run_ls('--host', 'localhost', '--port', '20000') }.to change { @status&.exitstatus }.to(1)

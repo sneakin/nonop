@@ -14,10 +14,10 @@ describe 'nonop put' do
 
     describe 'with spec aname' do
       def run_cat *args, &blk
-        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, &blk)
+        run_nonop('cat', '--host', 'localhost', '--port', NonoP::SpecHelper::PORT.to_s, '--aname', 'spec', *args, &blk)
       end
       def run_put *args, &blk
-        run_nonop('put', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, mode: 'w', &blk)
+        run_nonop('put', '--host', 'localhost', '--port', NonoP::SpecHelper::PORT.to_s, '--aname', 'spec', *args, mode: 'w', &blk)
       end
 
       shared_examples_for 'happy put' do |target:, content: 'Foo bar'|
@@ -87,10 +87,10 @@ describe 'nonop put' do
     end
 
     it 'a bad host exits w/ an error' do
-      expect { run_put('scratch', '--host', 'example.local', '--port', '10000') }.to change { @status&.exitstatus }.to(1)
+      expect { run_put('scratch', '--host', 'example.local', '--port', NonoP::SpecHelper::PORT.to_s) }.to change { @status&.exitstatus }.to(1)
     end
     xit 'a bad host exits w/ an error' do
-      expect { run_put('scratch', '--host', 'example.com', '--port', '10000') }.to change { @status&.exitstatus }.to(1)
+      expect { run_put('scratch', '--host', 'example.com', '--port', NonoP::SpecHelper::PORT.to_s) }.to change { @status&.exitstatus }.to(1)
     end
     it 'a bad port exits w/ an error' do
       expect { run_put('scratch', '--host', 'localhost', '--port', '20000') }.to change { @status&.exitstatus }.to(1)

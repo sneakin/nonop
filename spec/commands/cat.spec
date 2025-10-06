@@ -14,7 +14,7 @@ describe 'nonop cat' do
 
     describe 'with spec aname' do
       def run_cat *args, &blk
-        run_nonop('cat', '--host', 'localhost', '--port', '10000', '--aname', 'spec', *args, &blk)
+        run_nonop('cat', '--host', 'localhost', '--port', NonoP::SpecHelper::PORT.to_s, '--aname', 'spec', *args, &blk)
       end
       
       describe 'with paths' do
@@ -69,10 +69,10 @@ EOT
     end
 
     it 'a bad host exits w/ an error' do
-      expect { run_cat('welcome', '--host', 'example.local', '--port', '10000') }.to change { @status&.exitstatus }.to(1)
+      expect { run_cat('welcome', '--host', 'example.local', '--port', NonoP::SpecHelper::PORT.to_s) }.to change { @status&.exitstatus }.to(1)
     end
     xit 'a bad host exits w/ an error' do
-      expect { run_cat('welcome', '--host', 'example.com', '--port', '10000') }.to change { @status&.exitstatus }.to(1)
+      expect { run_cat('welcome', '--host', 'example.com', '--port', NonoP::SpecHelper::PORT.to_s) }.to change { @status&.exitstatus }.to(1)
     end
     it 'a bad port exits w/ an error' do
       expect { run_cat('welcome', '--host', 'localhost', '--port', '20000') }.to change { @status&.exitstatus }.to(1)
