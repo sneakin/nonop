@@ -28,7 +28,7 @@ module NonoP
           RWX:    PermBits[:R] | PermBits[:W] | PermBits[:X],
           RX:     PermBits[:R] | PermBits[:X],
           RW:     PermBits[:R] | PermBits[:W],
-        })
+        }, 'PermMode')
 
   def self.perm_mode_string mode
     [ mode & :DIR ? 'd' : (mode & :FIFO ? 'p' : '-'),
