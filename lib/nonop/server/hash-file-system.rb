@@ -752,8 +752,8 @@ module NonoP::Server
 
     # @param fsid [Integer]
     # @param name [String]
-    # @param flags [Integer]
-    # @param mode [Integer]
+    # @param flags [NonoP::BitField::Instance]
+    # @param mode [NonoP::BitField::Instance]
     # @param gid [Integer]
     # @return [Integer]
     def create fsid, name, flags, mode, gid

@@ -69,13 +69,13 @@ module NonoP
       end
 
       # @param bits [Array<[Integer, Symbol, String]>]
-      # @return [self]
+      # @return [BitField::Instance]
       def set *bits
           dup.set!(*bits)
       end
       
       # @param bits [Array<[Integer, Symbol, String]>]
-      # @return [self]
+      # @return [BitField::Instance]
       def clear *bits
           dup.clear!(*bits)
       end
@@ -88,7 +88,7 @@ module NonoP
       end
 
       # @param bits [Array<[Integer, Symbol, String]>]
-      # @return [self]
+      # @return [BitField::Instance]
       def mask *bits
           dup.mask!(*bits)
       end

@@ -36,6 +36,7 @@ module NonoP::Server
     class Entry
       # Provides the data for OpenedEntry hhat is dependent on the entry's type.
       class DataProvider
+        # @return [NonoP::BitField::Instance]
         attr_reader :mode
 
         # @return [Boolean]
@@ -57,7 +58,7 @@ module NonoP::Server
         end
                 
         # @abstract
-        # @param mode [Integer. NonoP::BitField::Instance]
+        # @param mode [NonoP::BitField::Instance]
         # @return [self]
         # @raise SystemCallError
         def open mode
@@ -167,8 +168,8 @@ module NonoP::Server
 
       # @abstract
       # @param name String
-      # @param flags [Integer]
-      # @param mode [Integer]
+      # @param flags [NonoP::BitField::Instance]
+      # @param mode [NonoP::BitField::Instance]
       # @param gid [Integer]
       # @return [OpenedEntry]
       # @raise SystemCallError
@@ -262,8 +263,8 @@ module NonoP::Server
     # @abstract
     # @param fsid [Integer]
     # @param name String
-    # @param flags [Integer]
-    # @param mode [Integer]
+    # @param flags [NonoP::BitField::Instance]
+    # @param mode [NonoP::BitField::Instance]
     # @param gid [Integer]
     # @return [OpenedEntry]
     # @raise SystemCallError
