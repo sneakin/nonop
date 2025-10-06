@@ -41,5 +41,6 @@
 *** Temporary files for saves
 
 * Bugs
+** `..` walks up the dir tree...or is that Linux?
 ** Deadlock when exporting itself in the file system.
 ** Fifos

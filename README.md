@@ -10,6 +10,8 @@ All trademark and other rights reserved.
 
 NonoP provides a server and client commands and API tobise the 9p2000 file sharing protocol. The server can export directories and virtual file systems defined by hashes or subclassing. The client commands perform CRUD and other 9p operations. All this and more can be used directly via the API.
 
+Attention
+: This is still more a proof of concept. Writing, xattr, locks, and features beyond basic reading likely won't work or at worst appear to work but drop bytes. There's enough support for a mostly read-only file system that can be mounted by Linux and Diod's 9p drivers.
 
 # Installation
 
