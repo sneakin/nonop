@@ -22,7 +22,7 @@ module NonoP
       end
       
       def flags= v
-        @flags = NonoP::L2000::Topen::FlagField.new(v)
+        @flags = NonoP::OpenFlags.new(v)
       end
     end
 

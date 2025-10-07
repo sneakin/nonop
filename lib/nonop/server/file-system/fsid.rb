@@ -20,7 +20,7 @@ module NonoP::Server::FileSystem
     def initialize path, entry, open_flags: nil, backend: nil
       @path = path
       @entry = entry
-      @open_flags = NonoP::L2000::Topen::FlagField.new(open_flags)
+      @open_flags = NonoP::OpenFlags.new(open_flags)
       @backend = backend
     end
 
@@ -31,7 +31,7 @@ module NonoP::Server::FileSystem
 
     # @return [Boolean]
     def reading?
-      (0 == (open_flags.mask(NonoP::L2000::Topen::Mask[:MODE])) ||
+      (0 == (open_flags.mask(NonoP::OpenFlags[:MODE])) ||
        (open_flags & :RDWR))
     end
 

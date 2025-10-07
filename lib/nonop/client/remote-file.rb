@@ -5,6 +5,7 @@ require_relative '../async'
 require_relative '../util'
 require_relative '../remote-path'
 require_relative 'remote-io'
+require_relative '../open-flags'
 
 module NonoP
   class RemoteFile
@@ -13,7 +14,7 @@ module NonoP
     def initialize path, attachment:, flags: nil, fid: nil, mode: nil, gid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
-      @flags = L2000::Topen::FlagField.new(flags || :RDONLY)
+      @flags = NonoP::OpenFlags.new(flags || :RDONLY)
       @fid = fid || client.next_fid
       @io = RemoteIO.new(client, @fid, path)
       open(mode: mode, gid: gid, &blk)

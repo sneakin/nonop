@@ -4,6 +4,7 @@ using SG::Ext
 require_relative '../async'
 require_relative '../util'
 require_relative '../remote-path'
+require_relative '../open-flags'
 
 module NonoP
   class RemoteDir
@@ -14,7 +15,7 @@ module NonoP
     def initialize path, attachment:, flags: nil, fid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
-      @flags = NonoP::L2000::Topen::FlagField.new(flags || :DIRECTORY)
+      @flags = NonoP::OpenFlags.new(flags || :DIRECTORY)
       @fid = fid || client.next_fid
       open_self(&blk)
     end

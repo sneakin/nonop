@@ -219,7 +219,7 @@ module NonoP::Server
       stream = @open_fids.fetch(pkt.data.fid)
       NonoP.vputs { "Opening #{pkt.data.fid} #{stream.class} #{stream.qid.inspect}" }
       begin
-        stream.open(NonoP::L2000::Topen::FlagField.new(pkt.data.flags))
+        stream.open(NonoP::OpenFlags.new(pkt.data.flags))
         reply_to(pkt, NonoP::Ropen.new(qid: stream.qid || stream.fs.qid,
                                        iounit: 0))
       rescue KeyError
@@ -236,7 +236,7 @@ module NonoP::Server
       NonoP.vputs { "Creating #{pkt.data.fid} #{stream.qid.inspect}" }
       begin
         stream.create(pkt.data.name.to_s,
-                      NonoP::L2000::Topen::FlagField.new(pkt.data.flags),
+                      NonoP::OpenFlags.new(pkt.data.flags),
                       NonoP::PermMode.new(pkt.data.mode),
                       pkt.data.gid)
         reply_to(pkt, NonoP::Rcreate.new(qid: stream.qid || stream.fs.qid,

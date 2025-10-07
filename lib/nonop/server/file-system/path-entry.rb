@@ -34,13 +34,13 @@ module NonoP::Server::FileSystem
         return self if @io
         NonoP.vputs { "Opening #{self} #{path} #{p9_mode}" }
 
-        raise Errno::ENOTSUP if (!@writeable && (0 != (p9_mode.value & NonoP::L2000::Topen::Mask[:MODE])))
+        raise Errno::ENOTSUP if (!@writeable && (0 != (p9_mode.value & NonoP::OpenFlags[:MODE])))
         raise Errno::ENOENT if @writeable && (p9_mode & :CREATE) && !path.exist?
         # todo full mapping
-        mode = case p9_mode.value & NonoP::L2000::Topen::Mask[:MODE]
-               when NonoP::L2000::Topen::Flags[:RDONLY] then 'rb'
-               when NonoP::L2000::Topen::Flags[:WRONLY] then 'wb'
-               when NonoP::L2000::Topen::Flags[:RDWR] then 'rb+'
+        mode = case p9_mode.value & NonoP::OpenFlags[:MODE]
+               when NonoP::OpenFlags[:RDONLY] then 'rb'
+               when NonoP::OpenFlags[:WRONLY] then 'wb'
+               when NonoP::OpenFlags[:RDWR] then 'rb+'
                else 'rb'
                end
         mode[0] = 'a' if (p9_mode & :APPEND) || path.pipe?

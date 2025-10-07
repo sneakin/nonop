@@ -21,7 +21,7 @@ module NonoP::Server::FileSystem
       # @return [Boolean]
       def readable?
         (nil != mode) &&
-          ((0 == mode.mask(NonoP::L2000::Topen::Mask[:MODE])) ||
+          ((0 == mode.mask(NonoP::OpenFlags[:MODE])) ||
            (mode & [ :RDONLY, :RDWR ]))
       end
 
@@ -35,7 +35,7 @@ module NonoP::Server::FileSystem
       # @return [self]
       # @raise SystemCallError
       def open mode
-        @mode = NonoP::L2000::Topen::FlagField.new(mode)
+        @mode = NonoP::OpenFlags.new(mode)
         self
       end
 
