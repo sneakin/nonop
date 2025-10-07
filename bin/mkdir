@@ -4,114 +4,66 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'socket'
 require 'nonop'
-require 'munge'
-require 'optparse'
+require 'nonop/command'
 
-$verbose = false
-host = 'localhost'
-port = 564
-coder = nil
-uid = Process.uid
-uname = ENV['USER']
-auth_creds = nil
-aname = '/'
-short_list = true
+class MkDirCommand < NonoP::Command::Client
+  attr_reader :aname
+  
+  def initialize
+    super
+    @desc = 'Make a directory on a file server.'
+    @aname = '/'
+  end
+  
+  def opts
+    super.tap do |o|
+      o.on('-e', '--aname NAME') do |v|
+        @aname = v
+      end
+    end
+  end
 
-opts = OptionParser.new do |o|
-  desc = 'Make a directory on a file server.'
-  o.banner += "\n\n" + desc + "\n\n"
-  o.on('-H', '--help-banner') do
-    puts(desc)
-    exit(0)
-  end
-  o.on('-v', '--verbose') do
-    $verbose = true
-  end
-  o.on('--host HOST') do |v|
-    host = v
-  end
-  o.on('-p', '--port INTEGER', Integer) do |v|
-    port = v
-  end
-  o.on('-p', '--protocol NAWE') do |v|
-    coder = v
-  end
-  o.on('-u', '--uname NAME') do |v|
-    uname = v
-  end
-  o.on('--uid INTEGER') do |v|
-    uid = v.to_i
-  end
-  o.on('--auth-creds DATA') do |v|
-    auth_creds = v
-  end
-  o.on('-n', '--no-auth') do
-    auth_creds = false
-  end
-  o.on('-e', '--aname NAME') do |v|
-    aname = v
-  end
-  o.on('-l', '--long') do
-    short_list = false
-  end
-end
+  def run args
+    @errors = []
+    super do
+      client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+        raise attachment if RuntimeError === attachment
 
-paths = opts.parse(ARGV)
-paths << '' if paths.empty?
+        NonoP::Async.reduce(arguments) do |path, &cc|
+          mkdir(attachment, path) do |err|
+            if RuntimeError === err
+              $stderr.puts("%s - %s" % [ path, err ])
+              @errors << [ path, err ]
+            end
+            cc.call(false, &method(:done))
+          end
+        end
+      end
+    end
+  end
 
-sock = TCPSocket.new(host, port)
-coder = NonoP.coder_for(coder)
-client = NonoP::Client.new(coder: coder, io: sock)
-
-Signal.trap('INT') do
-  client.close
-end
-Signal.trap('QUIT') do
-  client.close
-end
-
-def dir_loop attachment, paths, max_name: 0, short_list: true, &blk
-  NonoP::Async.reduce(paths) do |path, &cc|
+  def mkdir attachment, path, &blk
     path = NonoP::RemotePath.new(path)
     attachment.opendir(path.parent) do |parent|
-      if StandardError === parent
-        $stderr.puts("%s - %s" % [ path, parent ])
-        next cc.call(false, &blk)
-      end
-      parent.mkdir(path.basename) do |dir|
-        if StandardError === dir
-          $stderr.puts("%s - %s" % [ path, dir ])
+      if RuntimeError === parent
+        blk.call(parent)
+      else
+        parent.mkdir(path.basename) do |dir|
+          parent.close
+          blk.call(dir)
         end
-        parent.close
-        cc.call(false, &blk)
-      end
-    end
-  end
-end
-
-client.start do |pkt|
-  main_loop = lambda do |*a|
-    client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-      raise attachment if StandardError === attachment
-
-      dir_loop(attachment, paths, short_list: short_list) do
-        client.close
       end
     end
   end
 
-  if uid && auth_creds != false
-    auth_creds ||= Munge.encode(uid: uid)
-    client.auth(uname: uname,
-                aname: aname,
-                n_uname: uid,
-                credentials: auth_creds,
-                &main_loop)
-  else
-    main_loop.call
+  def done ok
+    NonoP.vputs { "All done. #{ok}" }
+    close
+    exit(1) unless @errors.empty?
   end
 end
 
-client.read_loop
+if __FILE__ == $0
+  MkDirCommand.new.run(ARGV)
+end

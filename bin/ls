@@ -4,175 +4,135 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'socket'
 require 'nonop'
-require 'munge'
-require 'optparse'
+require 'nonop/command'
 
-$verbose = false
-host = 'localhost'
-port = 564
-coder = nil
-uid = Process.uid
-uname = ENV['USER']
-auth_creds = nil
-aname = '/'
-short_list = true
-sort_field = :name
-reverse_sort = false
+class LsCommand < NonoP::Command::Client
+  attr_reader :aname, :short_list, :sort_field, :reverse_sort
+  def initialize
+    super
+    @desc = 'List a directory from a file server.'
+    @aname = '/'
+    @short_list = true
+    @sort_field = :name
+    @reverse_sort = false
+  end
 
-opts = OptionParser.new do |o|
-  desc = 'List a directory from a file server.'
-  o.banner += "\n\n" + desc + "\n\n"
-  o.on('-H', '--help-banner') do
-    puts(desc)
-    exit(0)
-  end
-  o.on('-v', '--verbose') do
-    $verbose = true
-  end
-  o.on('--host HOST') do |v|
-    host = v
-  end
-  o.on('--port INTEGER', Integer) do |v|
-    port = v
-  end
-  o.on('-P', '--protocol NAWE') do |v|
-    coder = v
-  end
-  o.on('-u', '--uname NAME') do |v|
-    uname = v
-  end
-  o.on('--uid INTEGER') do |v|
-    uid = v.to_i
-  end
-  o.on('--auth-creds DATA') do |v|
-    auth_creds = v
-  end
-  o.on('-n', '--no-auth') do
-    auth_creds = false
-  end
-  o.on('-e', '--aname NAME') do |v|
-    aname = v
-  end
-  o.on('-l', '--long') do
-    short_list = false
-  end
-  o.on('-s', '--sort FIELD') do |v|
-    v = v.to_sym
-    fields = [ :name, *NonoP::L2000::Rgetattr.members ]
-    if fields.include?(v)
-      sort_field = v
-    else
-      raise ArgumentError.new("#{v} is not a valid field. Try: #{fields.collect(&:to_s).join(', ')}")
-    end
-  end
-  o.on('-R', '--reverse') do
-    reverse_sort = true
-  end
-end
-
-paths = opts.parse(ARGV)
-paths << '' if paths.empty?
-
-sock = TCPSocket.new(host, port)
-coder = NonoP.coder_for(coder)
-client = NonoP::Client.new(coder: coder, io: sock)
-
-Signal.trap('INT') do
-  client.close
-end
-Signal.trap('QUIT') do
-  client.close
-end
-
-def dir_loop attachment, paths, max_name: 0, short_list: true, sort_field: nil, reverse_sort: false, &blk
-  NonoP::Async.reduce(paths) do |path, &cc|
-    attachment.opendir(path) do |dir|
-      puts("%s:" % [ path.empty?? '/' : path.to_s ])
-      if StandardError === dir
-        $stderr.puts("%s - %s" % [ path, dir ])
-        $had_errors = true
-        next cc.call(false, &blk)
+  def opts
+    super.tap do |o|
+      o.on('-e', '--aname NAME') do |v|
+        @aname = v
       end
-
-      new_max_name = 0
-
-      ents = dir.entries(wait_for: true).collect do |ent|
-        new_max_name = [ new_max_name, ent.name.size ].max
-        if (sort_field && sort_field != :name) || !short_list
-          stats = if attachment.client.remote_version == NonoP::L2000::Decoder::VERSION
-                    dir.getattr(ent.name.to_s)
-                  else
-                    dir.stat(ent.name.to_s)
-                  end
-          [ ent, stats ]
+      o.on('-l', '--long') do
+        @short_list = false
+      end
+      o.on('-s', '--sort FIELD') do |v|
+        v = v.to_sym
+        fields = [ :name, *NonoP::L2000::Rgetattr.members ]
+        if fields.include?(v)
+          @sort_field = v
         else
-          [ ent ]
+          raise ArgumentError.new("#{v} is not a valid field. Try: #{fields.collect(&:to_s).join(', ')}")
         end
       end
+      o.on('-R', '--reverse') do
+        @reverse_sort = true
+      end
+    end
+  end
 
+  def run args
+    @errors = nil
+    super do
+      client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+        raise attachment if RuntimeError === attachment
+
+        arguments << '' if arguments.empty?
+        NonoP::Async.reduce(arguments) do |path, &cc|
+          ls_dir(attachment, path) do
+            cc.call(false) do
+              close
+            end
+          end
+        end
+      end
+    end
+    exit(1) if @errors
+  end
+
+  def ls_dir attachment, path, max_name: 0, &blk
+    attachment.opendir(path) do |dir|
+      puts("%s:" % [ path.empty?? '/' : path.to_s ])
+      if RuntimeError === dir
+        $stderr.puts("%s - %s" % [ path, dir ])
+        @errors = true
+        next blk.call
+      end
+
+      ents = read_dirents(dir)
+      new_max_name = [ max_name, ents.collect { _1[0].name.size }.max ].max
       new_max_name = 2 + new_max_name
       max_name = new_max_name if max_name < new_max_name
 
       ents = if sort_field == :name
                ents.sort_by { _1[0].name }
              elsif sort_field
-               ents.sort_by { (!(NonoP::L2000::Rerror === _1[1]) && NonoP::Packet::Data === _1[1]) ? _1[1].send(sort_field) : NonoP::ComparableNil.instance }
+               ents.sort_by do
+                 if !(NonoP::L2000::Rerror === _1[1]) && NonoP::Packet::Data === _1[1]
+                   _1[1].send(sort_field)
+                 else
+                   NonoP::ComparableNil.instance
+                 end
+               end
              else
                ents
              end
-      if reverse_sort
-        ents = ents.reverse
-      end
+      ents = ents.reverse if reverse_sort
       ents.each do |ent, ent_stats|
-        if StandardError === ent_stats
-          puts("  \e[1m%-*s\e[0m %s" %
-               [ max_name, ent.name.to_s, ent_stats ])
-        elsif NonoP::ErrorPayload === ent_stats
-          puts("  \e[1m%-*s\e[0m Error: %s" %
-               [ max_name, ent.name.to_s,
-                 SystemCallError.new(ent.name.to_s, ent_stats.code) ])
-        elsif ent_stats && !short_list
-          puts("  \e[1m%-*s \e[0;37m%8i %10s %8s %8s %18s\e[0m" %
-               [ max_name, ent.name.to_s, ent_stats.size, NonoP.perm_mode_string(ent_stats.mode), ent_stats.uid, ent_stats.gid, ent_stats.mtime_sec.strftime("%x %X") ])
-        else
-          puts("  \e[1m%-*s\e[0m" %
-               [ max_name, ent.name.to_s ])
-        end
+        print_dirent(ent, ent_stats, max_name)
       end
 
-      cc.call(false, &blk)
+      blk.call
     end
   end
-end
 
-client.start do |pkt|
-  main_loop = lambda do |*a|
-    client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-      raise attachment if StandardError === attachment
-
-      dir_loop(attachment, paths,
-               short_list: short_list,
-               sort_field: sort_field,
-               reverse_sort: reverse_sort) do
-        client.close
+  def read_dirents dir
+    dir.entries(wait_for: true).collect do |ent|
+      if (sort_field && sort_field != :name) || !short_list
+        stats = if client.remote_version == NonoP::L2000::Decoder::VERSION
+                  dir.getattr(ent.name.to_s)
+                else
+                  dir.stat(ent.name.to_s)
+                end
+        [ ent, stats ]
+      else
+        [ ent ]
       end
     end
   end
 
-  if uid && auth_creds != false
-    auth_creds ||= Munge.encode(uid: uid)
-    client.auth(uname: uname,
-                aname: aname,
-                n_uname: uid,
-                credentials: auth_creds,
-                &main_loop)
-  else
-    main_loop.call
-  end
+  def print_dirent ent, stats, max_name
+    if RuntimeError === stats
+      puts("  \e[1m%-*s\e[0m %s" %
+           [ max_name, ent.name.to_s, stats ])
+    elsif NonoP::ErrorPayload === stats
+      puts("  \e[1m%-*s\e[0m Error: %s" %
+           [ max_name, ent.name.to_s,
+             SystemCallError.new(ent.name.to_s, stats.code) ])
+    elsif stats && !short_list
+      puts("  \e[1m%-*s \e[0;37m%8i %10s %8s %8s %18s\e[0m" %
+           [ max_name, ent.name.to_s,
+             stats.size,
+             NonoP.perm_mode_string(stats.mode),
+             stats.uid, stats.gid,
+             stats.mtime_sec.strftime("%x %X") ])
+    else
+      puts("  \e[1m%-*s\e[0m" %
+           [ max_name, ent.name.to_s ])
+    end
+  end    
 end
 
-client.read_loop
-
-exit(1) if $had_errors
+if __FILE__ == $0
+  LsCommand.new.run(ARGV)
+end

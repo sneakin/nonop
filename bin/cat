@@ -4,111 +4,78 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'socket'
 require 'nonop'
-require 'munge'
-require 'optparse'
+require 'nonop/command'
 
-$verbose = false
-host = 'localhost'
-port = 564
-coder = nil
-uid = Process.uid
-uname = ENV['USER']
-auth_creds = nil
-aname = '/'
-buffer_size = 4096
-block_size = 4096
-
-opts = OptionParser.new do |o|
-  desc = 'Read a file from a file server.'
-  o.banner += "\n\n" + desc + "\n\n"
-  o.on('-H', '--help-banner') do
-    puts(desc)
-    exit(0)
+class CatCommand < NonoP::Command::Client
+  attr_reader :aname, :block_size
+  
+  def initialize
+    super
+    @desc = 'Read a file from a file server.'
+    @aname = '/'
+    @block_size = 4096
   end
-  o.on('-v', '--verbose') do
-    $verbose = true
-  end
-  o.on('--host HOST') do |v|
-    host = v
-  end
-  o.on('-p', '--port INTEGER', Integer) do |v|
-    port = v
-  end
-  o.on('-P', '--protocol NAWE') do |v|
-    coder = v
-  end
-  o.on('-u', '--uname NAME') do |v|
-    uname = v
-  end
-  o.on('--uid INTEGER', Integer) do |v|
-    uid = v.to_i
-    uid = nil if uid < 0
-  end
-  o.on('--auth-creds CREDS') do |v|
-    auth_creds = v
-  end
-  o.on('-n', '--no-auth') do
-    auth_creds = false
-  end
-  o.on('-e', '--aname NAME') do |v|
-    aname = v
-  end
-  o.on('--buffer-size BYTES', Integer) do |v|
-    buffer_size = v
-  end
-  o.on('--block-size BYTES', Integer) do |v|
-    block_size = v
-  end
-end
-
-paths = opts.parse(ARGV)
-paths << '' if paths.empty?
-
-sock = TCPSocket.new(host, port)
-coder = NonoP.coder_for(coder)
-client = NonoP::Client.new(coder: coder, io: sock)
-
-%w{INT QUIT}.each do |sig|
-  Signal.trap(sig) do
-    NonoP.vputs("Goodbye.")
-    client.close
-  end
-end
-
-def parse_path path
-  # todo files with colons?
-  case path
-  when /(.+[^\\]):(\d+)@(\d+)$/ then [ $1, $2&.to_i, $3&.to_i ]
-  when /(.+[^\\]):(\d+)$/ then [ $1, $2&.to_i, nil ]
-  when /(.+[^\\])@(\d+)$/ then [ $1, nil, $2&.to_i ]
-  else [ path, nil, nil ]
-  end.tap { |(p, cnt, off)| [ p.gsub(/:$/, ''), cnt, off ] }
-end
-
-# A read loop
-def read_fn file, offset, length, block_size, &blk
-  # todo move into RemoteFile?
-  length ||= NonoP::MAX_U64
-  NonoP::Async.reduce(Range.new(offset, offset + length).step(block_size),
-                      offset) do |count, offset, &cc|
-    file.read(block_size, offset: offset) do |data|
-      NonoP.vputs { "Received #{data.class} #{data.to_s.size}" }
-      raise data if StandardError === data # todo where is it handled?
-      blk.call(data)
-      cc.call(data == nil || data.empty?, offset + data.bytesize) do |status, offset|
-        # Close the file
-        file.close
-        # Continue on
-        blk.call(nil)
+  
+  def opts
+    super.tap do |o|
+      o.on('-e', '--aname NAME') do |v|
+        @aname = v
+      end
+      o.on('--block-size BYTES', Integer) do |v|
+        @block_size = v
       end
     end
   end
-end
 
-client.start do |pkt|
-  main_loop = lambda do |*a|
+  def run args
+    super do
+      arguments << '' if arguments.empty?
+      start_request_loop(arguments)
+    end
+    exit(1) unless @errors&.empty?
+  end
+
+  def parse_path path
+    # todo files with colons?
+    case path
+    when /(.+[^\\]):(\d+)@(\d+)$/ then [ $1, $2&.to_i, $3&.to_i ]
+    when /(.+[^\\]):(\d+)$/ then [ $1, $2&.to_i, nil ]
+    when /(.+[^\\])@(\d+)$/ then [ $1, nil, $2&.to_i ]
+    else [ path, nil, nil ]
+    end.tap do |(p, cnt, off)|
+      [ NonoP::RemotePath.new(p.gsub(/:$/, '')), cnt, off ]
+    end
+  end
+
+  # A read loop
+  def read_fn file, offset, length, block_size, &blk
+    # todo move into RemoteFile?
+    length ||= NonoP::MAX_U64
+    NonoP::Async.reduce(Range.new(offset, offset + length).step(block_size),
+                        offset) do |count, offset, &cc|
+      file.read(block_size, offset: offset) do |data|
+        NonoP.vputs { "Received #{data.class} #{data.to_s.size}" }
+        raise data if StandardError === data # todo where is it handled?
+        blk.call(data)
+        cc.call(data == nil || data.empty?, offset + data.bytesize) do |status, offset|
+          # Close the file
+          file.close
+          # Continue on
+          blk.call(nil)
+        end
+      end
+    end
+  end
+
+  def finish_up paths, status, final_count
+    NonoP.vputs { [ "Received:",
+                    *paths.zip(final_count). collect { "  #{_1}: #{_2}" } ] }
+    client.close
+    @errors = paths.zip(final_count).select { StandardError === _2 }
+  end
+
+  def start_request_loop paths
     client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
       raise attachment if StandardError === attachment
       # A loop through the paths but only after tte callbacks complete
@@ -116,14 +83,10 @@ client.start do |pkt|
         path, max_count, offset = parse_path(path)
         NonoP.vputs { "Reading path #{path} #{max_count} #{offset}" }
         attachment.open(path, flags: [:RDONLY]) do |file|
-          fin = lambda do |status, final_count|
-            NonoP.vputs { paths.zip(final_count).to_a.inspect }
-            client.close
-            $had_errors = final_count.any? { RuntimeError === _1  }
-          end
           if StandardError === file
-            $stderr.puts(file.message)
-            cc.call(false, counts + [ file ], &fin)
+            $stderr.puts("Error on #{path}: #{file}")
+            NonoP.vputs { file.backtrace }
+            cc.call(false, counts + [ file ]) { finish_up(paths, _1, _2) }
           else
             count = 0
             read_fn(file, offset || 0, max_count, block_size) do |data|
@@ -132,7 +95,7 @@ client.start do |pkt|
                 count += data.bytesize
               else
                 # next file
-                cc.call(false, counts + [ count ], &fin)
+                cc.call(false, counts + [ count ]) { finish_up(paths, _1, _2) }
               end
             end
           end
@@ -140,19 +103,8 @@ client.start do |pkt|
       end
     end
   end
-
-  if uid && auth_creds != false
-    auth_creds ||= Munge.encode(uid: uid)
-    client.auth(uname: uname,
-                aname: aname,
-                n_uname: uid,
-                credentials: auth_creds,
-                &main_loop)
-  else
-    main_loop.call
-  end
 end
 
-client.read_loop
-
-exit(1) if $had_errors
+if __FILE__ == $0
+  CatCommand.new.run(ARGV)
+end

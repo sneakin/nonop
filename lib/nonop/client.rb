@@ -121,9 +121,9 @@ module NonoP
     delegate :max_msglen, :max_msglen=, :max_datalen, to: :coder
 
     def start &blk
-      request(Tversion.new(msize: max_msglen,
-                           version: NString.new(@coder.version)),
-                    wait_for: blk == nil) do |pkt|
+      result = request(Tversion.new(msize: max_msglen,
+                                    version: NString.new(@coder.version)),
+                       wait_for: blk == nil) do |pkt|
         case pkt
         when ErrorPayload then raise StartError.new(pkt)
         when Rversion then
@@ -135,7 +135,7 @@ module NonoP
         end
         blk&.call(pkt)
       end
-      self
+      blk == nil ? result : self
     end
 
     def local_version

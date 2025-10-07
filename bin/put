@@ -4,131 +4,70 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'socket'
 require 'nonop'
-require 'munge'
-require 'optparse'
+require 'nonop/command'
 
-$verbose = false
-host = 'localhost'
-port = 564
-coder = nil
-uid = Process.uid
-uname = ENV['USER']
-auth_creds = nil
-aname = '/'
-max_packet_size = nil
-block_size = 4096
-write_offset = 0
-write_limit = nil
-gid = Process.gid
-
-opts = OptionParser.new do |o|
-  desc = 'Write a file to a file server.'
-  o.banner += "\n\n" + desc + "\n\n"
-  o.on('--help-banner') do
-    puts(desc)
-    exit(0)
+class PutCommand < NonoP::Command::Client
+  attr_reader :aname, :block_size, :write_offset, :write_limit, :gid
+  
+  def initialize
+    super
+    @desc = 'Write a file to a file server.'
+    @aname = '/'
+    @block_size = 4096
+    @write_offset = 0
+    @write_limit = nil
+    @gid = Process.gid
   end
-  o.on('-v', '--verbose') do
-    $verbose = true
-  end
-  o.on('--host HOST') do |v|
-    host = v
-  end
-  o.on('-p', '--port INTEGER', Integer) do |v|
-    port = v
-  end
-  o.on('-P', '--protocol NAWE') do |v|
-    coder = v
-  end
-  o.on('--gid INTEGER', Integer) do |v|
-    gid = v.to_i
-    raise ArgumentError.new("GID must be positive") if gid < 0
-  end
-  o.on('-u', '--uname NAME') do |v|
-    uname = v
-  end
-  o.on('--uid INTEGER', Integer) do |v|
-    uid = v.to_i
-    uid = nil if uid < 0
-  end
-  o.on('--auth-creds CREDS') do |v|
-    auth_creds = v
-  end
-  o.on('-n', '--no-auth') do
-    auth_creds = false
-  end
-  o.on('-e', '--aname NAME') do |v|
-    aname = v
-  end
-  o.on('--max-packet-size BYTES', Integer) do |v|
-    max_packet_size = v
-  end
-  o.on('--block-size BYTES', Integer) do |v|
-    block_size = v
-  end
-  o.on('--offset INTEGER', Integer) do |v|
-    write_offset = v
-  end
-  o.on('--limit INTEGER', Integer) do |v|
-    write_limit = v
-  end
-end
-
-paths = opts.parse(ARGV)
-paths << '' if paths.empty?
-
-sock = TCPSocket.new(host, port)
-coder = NonoP.coder_for(coder, max_msglen: max_packet_size)
-client = NonoP::Client.new(coder: coder, io: sock)
-
-Signal.trap('INT') do
-  client.close
-end
-Signal.trap('QUIT') do
-  client.close
-end
-
-client.start do |pkt|
-  if block_size >= pkt.msize
-    block_size = pkt.msize - NonoP::Decoder::MIN_MSGLEN
+  
+  def opts
+    super.tap do |o|
+      o.on('--gid INTEGER', Integer) do |v|
+        @gid = v.to_i
+        raise ArgumentError.new("GID must be positive") if gid < 0
+      end
+      o.on('-e', '--aname NAME') do |v|
+        @aname = v
+      end
+      o.on('--block-size BYTES', Integer) do |v|
+        @block_size = v
+      end
+      o.on('--offset INTEGER', Integer) do |v|
+        @write_offset = v
+      end
+      o.on('--limit INTEGER', Integer) do |v|
+        @write_limit = v
+      end
+    end
   end
 
-  main_loop = lambda do |*a|
-    client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-      raise attachment if StandardError === attachment
+  def run args
+    super do
+      raise ArgumentError.new('No target specified.') if arguments.empty?
 
-      reader = Enumerator.new do |y|
-        begin
-          data = $stdin.read(block_size)
-          y << data
-        end until data.empty?
-        raise StopIteration
-      rescue IOError
-        raise StopIteration
+      if block_size >= client.server_info[:msize]
+        block_size = client.server_info[:msize] - NonoP::Decoder::MIN_MSGLEN
       end
 
-      attachment.open(paths[0], gid: gid, flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
-        raise file if StandardError === file
+      put(reader, arguments[0])
+    end
+  end
 
-        doner = lambda do |status, count, offset, err|
-          client.close
-          if StandardError === status
-            $stderr.puts("Error #{status.message}", *status.backtrace)
-            exit(-1) if err
-          else
-            NonoP.vputs("ALL DONE")
-          end
-        end
+  def put reader, target
+    NonoP.vputs { "Put to #{target}" }
+    client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
+      raise attachment if RuntimeError === attachment
+
+      attachment.open(target, gid: gid, flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
+        raise file if RuntimeError === file
 
         NonoP::Async.reduce(reader, 0, write_offset, false) do |data_block, count, offset, err, &cc|
           NonoP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
           file.write(data_block, offset: offset) do |reply|
             if nil == reply
-              cc.call(true, count, offset, false, &doner)
-            elsif StandardError === reply
-              cc.call(reply, count, offset, true, &doner)
+              cc.call(true, count, offset, false, &method(:finish))
+            elsif RuntimeError === reply
+              cc.call(reply, count, offset, true, &method(:finish))
             else
               if data_block.bytesize < block_size
                 file.close
@@ -137,25 +76,41 @@ client.start do |pkt|
               cc.call(data_block.bytesize < block_size,
                       count + reply,
                       offset + reply,
-                      reply < data_block.size, &doner)
+                      reply < data_block.size, &method(:finish))
             end
           end
         end
       end
     end
-  end
+  end    
 
-  if uid && auth_creds != false
-    auth_creds ||= Munge.encode(uid: uid)
-    client.auth(uname: uname,
-                aname: aname,
-                n_uname: uid,
-                credentials: auth_creds,
-                &main_loop)
-  else
-    main_loop.call
+
+  private
+  
+  def reader io = $stdin
+    Enumerator.new do |y|
+      begin
+        data = io.read(block_size)
+        y << data
+      end until data.empty?
+      raise StopIteration
+    rescue IOError
+      raise StopIteration
+    end
   end
+  
+  def finish status, count, offset, err
+    client.close
+    if RuntimeError === status
+      $stderr.puts("Error #{status.message}", *status.backtrace)
+      exit(-1) if err
+    else
+      NonoP.vputs("ALL DONE")
+    end
+  end
+  
 end
 
-client.read_loop
-
+if __FILE__ == $0
+  PutCommand.new.run(ARGV)
+end
