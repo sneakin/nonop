@@ -15,6 +15,7 @@ module NonoP
       super()
       case opts
         in [] then @size = 0
+        in [ nil ] then @size = 0
         in [ Integer, String ] then @size, @value = opts
         in [ Integer ] then @size = opts[0]
         in [ Hash ] then @size, @value = opts[0].pick(:size, :value)
