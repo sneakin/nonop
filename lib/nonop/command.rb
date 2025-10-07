@@ -97,7 +97,7 @@ module NonoP
         client.start
 
         if uid && auth_creds != false
-          auth_creds ||= Munge.encode(uid: uid)
+          @auth_creds ||= Munge.encode(uid: uid) # todo auth provider
           client.auth(uname: uname,
                       aname: aname,
                       n_uname: uid,
