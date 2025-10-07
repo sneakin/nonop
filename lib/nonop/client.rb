@@ -146,12 +146,12 @@ module NonoP
       server_info[:version]
     end
 
-    def auth uname:, n_uname:, aname:, credentials:, &blk
+    def auth uname:, n_uname:, aname:, credentials:, wait_for: false, &blk
       # Authenticating with Diode requires sending an Auth packet
       # followed by attaching to the live afid. This is followed by
       # clunking the two fids and attaching again with afid = -1.
       # The supplied block should make the second attachment.
-      send_auth(uname:, aname:, n_uname:) do |io, &cc|
+      send_auth(uname:, aname:, n_uname:, wait_for: blk == nil) do |io, &cc|
         raise io if StandardError === io
 
         auth_cc = lambda do |reply = nil, &cc|
@@ -171,20 +171,20 @@ module NonoP
       end
     end
 
-    def send_auth uname:, n_uname:, aname:, &blk
+    def send_auth uname:, n_uname:, aname:, wait_for: false, &blk
       NonoP.vputs { "Authenticating #{n_uname}" }
       auth_fid = 0
-      request(L2000::Tauth.new(afid: auth_fid,
-                               uname: NString.new(uname),
-                               aname: NString.new(aname),
-                               n_uname: n_uname),
-              wait_for: blk == nil) do |pkt|
+      result = request(L2000::Tauth.new(afid: auth_fid,
+                                        uname: NString.new(uname),
+                                        aname: NString.new(aname),
+                                        n_uname: n_uname),
+                       wait_for: wait_for || blk == nil) do |pkt|
         case pkt
         when ErrorPayload then
           if pkt.code != 2 && !blk
             raise AuthError.new(pkt)
           else
-            blk.call(NonoP.maybe_wrap_error(pkt, AuthError))
+            NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, AuthError))
           end
         when Rauth then
           @afid = auth_fid
@@ -194,10 +194,15 @@ module NonoP
           blk&.call(io) do |&cc|
             io.close(&cc)
           end
-        else blk&.call(pkt)
+        else NonoP.maybe_call(blk, pkt)
         end
       end
-      self
+
+      if wait_for || blk == nil
+        result
+      else
+        self
+      end
     end
 
     def clunk fid, async: nil, &blk
@@ -206,8 +211,8 @@ module NonoP
       result = request(NonoP::Tclunk.new(fid: fid),
               wait_for: async != true && blk == nil) do |reply|
         case reply
-        when ErrorPayload then blk&.call(NonoP.maybe_wrap_error(reply, ClunkError))
-        when Rclunk then blk&.call(reply)
+        when ErrorPayload then NonoP.maybe_call(blk, (NonoP.maybe_wrap_error(reply, ClunkError)))
+        when Rclunk then NonoP.maybe_call(blk, reply)
         else raise TypeError.new(reply.class)
         end
       end

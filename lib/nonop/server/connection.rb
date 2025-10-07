@@ -200,7 +200,7 @@ module NonoP::Server
       # Empty list needs to make a new fid
       stream = @open_fids.fetch(pkt.data.fid)
       qids, fsid = stream.walk(pkt.data.wnames.collect(&:to_s))
-      NonoP.vputs { "Walked #{pkt.data.wnames} #{qids.inspect}" }
+      NonoP.vputs { "Walked #{fsid} #{pkt.data.wnames} #{qids.inspect}" }
       if qids && fsid
         new_stream = FileStream.new(stream.fs, pkt.data.newfid, qids, fsid)
         @open_fids[pkt.data.newfid] = new_stream

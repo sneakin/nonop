@@ -91,7 +91,7 @@ module NonoP
 
     def walk path, nfid: nil, fid: nil, wait_for: nil, &blk
       nfid ||= client.next_fid
-      path = RemotePath.new(path)
+      path = RemotePath.new(path) unless RemotePath === path
       result = client.request(NonoP::Twalk.new(fid: fid || self.fid,
                                                newfid: nfid,
                                                wnames: path.collect { NonoP::NString.new(_1) }),

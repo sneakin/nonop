@@ -30,29 +30,31 @@ module NonoP
 
     def open mode: nil, gid: nil, &blk
       attachment.walk(@path, nfid: @fid) do |pkt|
+        NonoP.vputs { "Walked to #{@flags} #{@flags & :CREATE} #{@path.size} #{pkt.inspect}" }
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
-            client.clunk(@fid)
-            if @flags & :CREATE
-              create(mode: mode, gid: gid, &blk)
-            else
-              blk&.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
+            client.clunk(@fid) do 
+              if @flags & :CREATE
+                create(mode: mode, gid: gid, &blk)
+              else
+                blk.call(WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
+              end
             end
           else
             client.track_fid(@fid) { self.close }
             client.request(NonoP::L2000::Topen.new(fid: @fid,
                                                    flags: @flags)) do |pkt|
               if ErrorPayload === pkt
-                blk&.call(OpenError.new(pkt))
+                blk.call(OpenError.new(pkt))
               else
                 @ready = true
-                blk&.call(self)
+                blk.call(self)
               end
             end
           end
-        when StandardError then blk&.call(pkt)
-        else blk&.call(TypeError.new(pkt))
+        when StandardError then blk.call(pkt)
+        else blk.call(TypeError.new(pkt))
         end
       end
     end
@@ -72,11 +74,11 @@ module NonoP
                                             mode: mode || 0644,
                                             gid: gid || 0)) do |pkt|
             case pkt
-            when ErrorPayload then blk&.call(CreateError.new(pkt, path))
-            else blk&.call(self)
+            when ErrorPayload then blk.call(CreateError.new(pkt, path))
+            else blk.call(self)
             end
           end
-        when ErrorPayload then blk&.call(WalkError.new(pkt, path))
+        when ErrorPayload then blk.call(WalkError.new(pkt, path))
         else raise TypeError.new(pkt)
         end
       end
