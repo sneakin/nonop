@@ -21,6 +21,15 @@ module NonoP::Server::FileSystem
     end
 
     # @abstract
+    # @param fsid [FSID]
+    # @return [Qid]
+    # @raise SystemCallError
+    # @raise KeyError
+    def fsid_qid fsid
+      raise Errno::ENOTSUP
+    end
+
+    # @abstract
     # @param fsid [Integer]
     # @param flags [Integer]
     # @return [Boolean]

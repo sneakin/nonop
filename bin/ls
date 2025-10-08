@@ -70,7 +70,7 @@ class LsCommand < NonoP::Command::Client
       end
 
       ents = read_dirents(dir)
-      new_max_name = [ max_name, ents.collect { _1[0].name.size }.max ].max
+      new_max_name = [ max_name, ents.collect { _1[0].name.size }.max || 0 ].max
       new_max_name = 2 + new_max_name
       max_name = new_max_name if max_name < new_max_name
 

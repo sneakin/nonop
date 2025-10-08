@@ -74,6 +74,12 @@ module NonoP::Server
 
     # @param fsid [Integer]
     # @return [RemotePath]
+    def fsid_qid fsid
+      fsids.fetch(fsid).qid
+    end
+
+    # @param fsid [Integer]
+    # @return [RemotePath]
     def fsid_path fsid
       fsids.fetch(fsid).path
     end

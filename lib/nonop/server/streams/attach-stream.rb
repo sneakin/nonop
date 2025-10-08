@@ -16,6 +16,10 @@ module NonoP::Server
       self.class.new(fs, fid)
     end
 
+    def qid
+      @fs.qid
+    end
+
     def close
       self
     end

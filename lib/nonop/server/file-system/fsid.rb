@@ -69,6 +69,6 @@ module NonoP::Server::FileSystem
     end
 
     delegate :truncate, :read, :write, :readdir, to: :backend
-    delegate :size, :getattr, :setattr, to: :entry
+    delegate :qid, :size, :getattr, :setattr, to: :entry
   end
 end

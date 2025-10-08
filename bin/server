@@ -16,6 +16,8 @@ listen_on = nil
 port = 562
 auth_db_path = nil
 auth_provider = 'munge'
+needs_auth = true
+acl_path = 'YES'
 default_umask = File.umask
 reactor_timeout = 5 # secs
 exports = {}
@@ -37,11 +39,17 @@ opts = OptionParser.new do |o|
   o.on('-l', '--listen HOST') do |v|
     listen_on = v
   end
+  o.on('--[no-]auth') do |v|
+    needs_auth = v
+  end
   o.on('--auth-provider PATH') do |v|
     auth_provider = v
   end
   o.on('--auth-db PATH') do |v|
     auth_db_path = v
+  end
+  o.on('--acl PATH') do |v|
+    acl_path = v
   end
   o.on('--umask MASK') do |v|
     default_umask = v.to_i
@@ -75,10 +83,15 @@ else
   users['root'] = [ 0, 'root' ]
 end
 
-def format_server_stats stats
-  max_name = stats.keys.collect { _1.to_s.size }.max
-  stats.collect { "%-*s  %s" % [ max_name, _1, _2 ] }.join("\n") + "\n"
-end
+acl = case acl_path
+      when /\.rb\Z/ then
+        Class.new(NonoP::Server::ACL) do
+          instance_eval(File.read(acl_path), acl_path)
+        end
+      when /\.json\Z/ then NonoP::Server::HashAcl.new(JSON.load(File.read(acl_path)))
+      when 'YES' then NonoP::Server::YesAcl.new
+      else raise ArgumentError.new("Unknown ACL: #{acl_path}")
+      end
 
 reactor = SG::IO::Reactor.new
 auth = case auth_provider
@@ -86,10 +99,19 @@ auth = case auth_provider
        when 'yes' then NonoP::Server::YesAuth.new(users)
        else raise ArgumentError.new("Unknown auth provider: #{auth_provider}")
        end
-srvenv = NonoP::Server::Environment.new(reactor: reactor, authsrv: auth)
+srvenv = NonoP::Server::Environment.
+  new(reactor: reactor,
+      authsrv: auth,
+      acl: acl,
+      needs_auth: needs_auth)
 
 require 'tempfile'
 scratch_file = Tempfile.new
+
+def format_server_stats stats
+  max_name = stats.keys.collect { _1.to_s.size }.max
+  stats.collect { "%-*s  %s" % [ max_name, _1, _2 ] }.join("\n") + "\n"
+end
 
 ctlfs = NonoP::Server::HashFileSystem.
   new(umask: default_umask,

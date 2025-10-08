@@ -5,10 +5,27 @@ require_relative '../stream'
 
 module NonoP::Server
   class AuthStream < Stream
-    def initialize environment, user, data = nil
+    attr_reader :environment
+    attr_reader :user
+    attr_reader :uid
+    attr_reader :aname
+    attr_reader :remote_addr
+    attr_reader :data
+    
+    def initialize environment, pkt = nil, user: nil, uid: nil, aname: nil, data: nil, remote_addr: nil
       @environment = environment
-      @user = user
+      @user = user || pkt&.uname&.to_s
+      @user = nil if @user.blank?
+      @uid = uid || pkt&.n_uname
+      @aname = aname || pkt&.aname&.to_s
+      @remote_addr = remote_addr
       @data = data || ''
+    end
+
+    def qid
+      @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:AUTH],
+                              version: 0,
+                              path: [ hash ].pack('Q'))
     end
 
     def write data, offset = 0
@@ -17,14 +34,28 @@ module NonoP::Server
       data.size
     end
 
-    def authentic? uname, uid
-      NonoP.vputs { [ "Authenticating #{@user} #{uname} #{uid}", @data.inspect, @environment.find_user(@user).inspect ] }
-      (@user == uname || @user == uid) &&
-        @environment.authenticate(@user, @data)
+    def authentic? uname = nil, uid = nil, data = nil
+      NonoP.vputs {
+        addr = begin
+                 remote_addr.ip_address
+               rescue
+                 '---'
+               end
+        [ "Authenticating #{addr} #{@user} #{@aname} #{@uid} #{uname} #{uid}", (data || @data).inspect, @environment.find_user(@uid).inspect ]
+      }
+      (uname.blank? || @user == uname) &&
+        (uid.blank? || @uid == uid) &&
+        @environment.authenticate(remote_addr: @remote_addr,
+                                  user: uname.blank?? @user : uname,
+                                  uid: uid || @uid,
+                                  credentials: data || @data)
+      # todo clear data?
     end
 
     def dup
-      self.class.new(environment, user, data)
+      self.class.new(environment, aname: @aname,
+                     user: @user, uid: @uid,
+                     data: @data)
     end
   end
 end

@@ -17,6 +17,8 @@ module NonoP::Server
     # @return [Environment]
     attr_reader :environment
 
+    delegate :acl, to: :environment
+    
     # @param io [IO]
     # @param env [Environment]
     def initialize io, env
@@ -32,16 +34,22 @@ module NonoP::Server
     # @return [String]
     def to_s
       "\#<%s %s:%s>" % [ self.class.name,
-                         @io.remote_address.ip_address,
-                         @io.remote_address.ip_port ]
-    rescue SystemCallError
+                         remote_address&.ip_address || '<closed>',
+                         remote_address&.ip_port || '??' ]
+    rescue StandardError
       super
     end
 
+    def remote_address
+      @io.remote_address
+    rescue IOError, TypeError
+      nil
+    end
+    
     # @return [self]
     def close
+      puts("Closing #{self} #{closed?}")
       return self if closed?
-      NonoP.vputs { "Closing #{self} #{closed?}" }
       @input.close
       @output.close
       self
@@ -58,7 +66,8 @@ module NonoP::Server
 
     # @return [self]
     def reply_to pkt, msg
-      coder.send_one(NonoP::Packet.new(tag: pkt.tag, data: msg),
+      pkt = pkt.tag unless Integer === pkt
+      coder.send_one(NonoP::Packet.new(tag: pkt, data: msg),
                      output)
       self
     rescue SystemCallError
@@ -86,18 +95,17 @@ module NonoP::Server
       pkt = coder.read_one(@io)
       handler = Handlers.fetch(pkt.data.class, :on_unknown)
       send(handler, pkt)
-    rescue SG::PackedStruct::NoDataError, Errno::ECONNRESET
-      if io.eof?
-        puts("Closed #{self}")
-      else
-        puts("Error on #{self}: #{$!.message}")
-      end
+    rescue SG::PackedStruct::NoDataError, IOError, Errno::ECONNRESET
+      NonoP.vputs { "#{$!.class} on #{self}: #{$!.message}" }
       close
     rescue
+      if pkt
+        reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADMSG))
+      else
+        close
+      end
       puts("Error on #{self} #{$!.class}: #{$!.message}")
-      NonoP.vputs { $!.backtrace.join("\n") }
-      reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADMSG))
-      #close
+      NonoP.vputs { [ $!.class, $!.message, *$!.backtrace.join("\n") ] }
       self
     end
 
@@ -107,10 +115,15 @@ module NonoP::Server
                                         version: NonoP::NString.new(coder.version)))
     end
 
+    # Linux 9p goes straight for an attach w/ the uname, aname, uid=-1, and afid=-1. Then each user causes an attach w/ afid=-1, uname='', and uid set.
+    # Diod performs auth before handing off to 9p. It's a Tauth for the connection using uid and credentials followed an attach w/ blank uname andbuid. Then then hand off sending 9p's version & attach.
+    # Both need support, but not at the same time?
+    # Latter is always right now if themuser exists
+    # Attach opens the FS and needs to checck against export ACL
     # @return [void]
     def on_auth pkt
       if environment.has_user?(pkt.data.n_uname)
-        @open_fids[pkt.data.afid] = AuthStream.new(environment, pkt.data.n_uname)
+        @open_fids[pkt.data.afid] = AuthStream.new(environment, pkt.data, remote_addr: remote_address)
         reply_to(pkt, NonoP::L2000::Rauth.new(aqid: environment.auth_qid))
       else
         reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
@@ -119,40 +132,56 @@ module NonoP::Server
 
     # @return [void]
     def on_attach pkt
-      # todo the  fid ties the user to the export via fid cloning
-      stream = @open_fids.fetch(pkt.data.afid)
-      if stream.authentic?(pkt.data.uname, pkt.data.n_uname)
-        @open_fids[pkt.data.fid] = ErrantStream.instance
-        reply_to(pkt, NonoP::L2000::Rattach.new(aqid: environment.auth_qid))
+      # todo the fid should tie the user to the export via fid cloning; fixme legacy auth bypasses which is used by linux 9p on a per user basis
+      stream = nil
+      begin
+        stream = @open_fids.fetch(pkt.data.afid)
+      rescue KeyError
+        if pkt.data.afid == 0xFFFFFFFF # todo && no auth?
+          return on_legacy_auth(pkt)
+        else
+          return reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
+        end
+      end
+      
+      if stream.authentic?(pkt.data.uname.to_s, pkt.data.n_uname) &&
+          acl.attach?(pkt.data.aname.to_s,
+                      user: stream.user,
+                      uid: stream.uid,
+                      remote_addr: remote_address)
+        # todo get export via the stream?
+        fs = environment.get_export(pkt.data.aname.to_s)
+        @open_fids[pkt.data.fid] = stream = AttachStream.new(fs, pkt.data.fid)
+        reply_to(pkt, NonoP::L2000::Rattach.new(aqid: stream.qid))
       else
-        reply_to(pkt, NonoP::L2000::Rerror.new(Errno::ENEEDAUTH))
+        reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
       end
     rescue KeyError
-      if pkt.data.afid == 0xFFFFFFFF
-        on_legacy_auth(pkt)
-      else
-        reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
-      end
+      reply_to(pkt, NonoP::L2000::Rerror.new(Errno::ENOENT))
     end
 
     # @return [void]
     def on_legacy_auth pkt
-      fs = environment.get_export(pkt.data.aname.to_s)
+      # does -1 uid == anon?
 
-      if pkt.data.uname != nil || 0xFFFFFFFF == pkt.data.n_uname
-        # todo auth against per export databases
-        user = pkt.data.n_uname == 0xFFFFFFFF ? pkt.data.uname.to_s : pkt.data.n_uname
-        NonoP.vputs { "Legacy Authenticating #{user}" }
-        # fixme  even safe?
-        if environment.has_user?(user)
-          @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
-          reply_to(pkt, NonoP::L2000::Rattach.new(aqid: environment.auth_qid))
-        else
-          reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
-        end
+      # A mount -t 9p: uses uname='', uid
+      # todo auth against per export databases
+      # manual also says afid ~0 means no auth
+      user = pkt.data.uname.to_s if !pkt.data.uname.blank?
+      NonoP.vputs { "Legacy Authenticating #{user.inspect} #{pkt.data.n_uname}" }
+      # fixme  even safe? socket authenticated for user? acl?
+      if !environment.needs_auth? ||
+          acl.attach?(pkt.data.aname.to_s,
+                      user: user,
+                      uid: pkt.data.n_uname,
+                      remote_addr: remote_address)
+        fs = environment.get_export(pkt.data.aname.to_s)
+        @open_fids[pkt.data.fid] = stream = AttachStream.new(fs, pkt.data.fid)
+        reply_to(pkt, NonoP::L2000::Rattach.new(aqid: stream.qid))
       else
-        @open_fids[pkt.data.fid] = AttachStream.new(fs, pkt.data.fid)
-        reply_to(pkt, NonoP::L2000::Rattach.new(aqid: fs.qid))
+        # todo refuse anon access?
+        # todo auth not needed or lookup uid in export ACL
+        reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
       end
     rescue KeyError
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::ENOENT))

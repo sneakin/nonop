@@ -3,7 +3,7 @@ using SG::Ext
 
 module NonoP::Server
   class AuthService
-    def authenticate user, creds
+    def authenticate remote_addr: nil, user: nil, uid: nil, credentials: nil
       false
     end
     def find_user user
@@ -21,15 +21,16 @@ module NonoP::Server
     def initialize db
       @db = db
     end
-    def authenticate user, creds
-      u = find_user(user)
-      u && u[1] == creds.strip
+    def authenticate remote_addr: nil, user: nil, uid: nil, credentials: nil
+      u = find_user(uid) || find_user(user)
+      u && u[1] == credentials.strip
     end
     def find_user user
       case user
       when String then @db[user]
       when Integer then @db.find { _2[0] == user }&.then { _2 }
-      else raise TypeError.new('User not a string or ID.')
+      when nil then false
+      else raise TypeError.new("User not a string or ID but a #{user.inspect}")
       end
     end
     def has_user? user
@@ -41,21 +42,20 @@ module NonoP::Server
   end
 
   class YesAuth < AuthHash
-    def authenticate user, creds
-      return false unless has_user?(user)
-      true
+    def authenticate remote_addr: nil, user: nil, uid: nil, credentials: nil
+      has_user?(user) || has_user?(uid)
     end
   end
 
   class MungeAuth < AuthHash
-    def authenticate user, creds
-      return false unless has_user?(user)
+    def authenticate remote_addr: nil, user: nil, uid: nil, credentials: nil
+      return false unless has_user?(uid)
       status, meta, payload = Munge.verify do |io|
-        io.puts(creds)
+        io.puts(credentials)
       end
       status == 0 && meta.fetch('STATUS', '') =~ /^Success/ &&
-        (Integer === user && meta.fetch('UID', '') =~ /\(#{user}\)/ ||
-         String === user && meta.fetch('UID', '') =~ /#{user}/)
+        (uid && meta.fetch('UID', '') =~ /\(#{uid}\)/ ||
+         user && meta.fetch('UID', '') =~ /#{user}/)
     end
   end
 end

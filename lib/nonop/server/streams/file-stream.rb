@@ -32,10 +32,7 @@ module NonoP::Server
 
     # return [Qid]
     def qid
-      # todo more unique path value
-      @qid ||= @qids[-1] || NonoP::Qid.new(type: NonoP::Qid::Types[:FILE],
-                                           version: 0,
-                                           path: (fs.fsid_path(fsid).last || '/')[0, 8])
+      @qid ||= @qids[-1] || fs.fsid_qid(fsid)
     end
 
     # return [self]

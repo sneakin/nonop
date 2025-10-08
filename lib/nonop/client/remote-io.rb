@@ -15,8 +15,8 @@ module NonoP
       @path = path
     end
 
-    def close &blk
-      client.clunk(fid, &blk)
+    def close wait_for: false, &blk
+      client.clunk(fid, wait_for:, &blk)
       self
     end
 
@@ -44,7 +44,7 @@ module NonoP
       end
     end
 
-    def write data, offset: 0, length: nil, &blk
+    def write data, offset: 0, length: nil, wait_for: false, &blk
       raise ArgumentError.new("Offset must be positive") if offset < 0
       if data == nil
         if blk
@@ -54,18 +54,19 @@ module NonoP
           return 0
         end
       end
-      
+
+      wait_for ||= blk == nil
       length ||= data.size
       block_size = client.max_datalen
       slices = NonoP.block_string(data, block_size, length: length)
+      doner = lambda { |status, *a, **o, &b| status == true ? blk.call(*a, **o, &b) : blk.call(status, *a, **o, &b) }
       results = Async.reduce(slices, 0, offset) do |to_send, counter, offset, &cc|
         if to_send == nil || to_send.empty?
           cc.call(true, counter, offset, &blk)
           next
         end
 
-        write_one(to_send, offset: offset) do |result|
-          doner = lambda { |status, *a, **o, &b| status == true ? blk.call(*a, **o, &b) : blk.call(status, *a, **o, &b) }
+        write_one(to_send, offset: offset, wait_for:) do |result|
           if StandardError === result
             cc.call(result, counter, offset, &doner)
           elsif result.count == to_send.bytesize
@@ -84,23 +85,20 @@ module NonoP
       end
     end
 
-    def write_one data, offset: 0, &blk
+    def write_one data, offset: 0, wait_for: false, &blk
       raise ArgumentError.new("Length %i must be 1...%i" % [ data.bytesize, client.max_datalen ]) unless (1..client.max_datalen) === data.bytesize
       raise ArgumentError.new("Offset must be positive") if offset < 0
 
+      wait_for ||= blk == nil
       req = client.request(Twrite.new(fid: fid, offset: offset, data: data),
-                     wait_for: blk == nil) do |result|
-        blk&.call(NonoP.maybe_wrap_error(result, WriteError))
+                           wait_for:) do |result|
+        NonoP.maybe_call(blk, NonoP.maybe_wrap_error(result, WriteError))
       end
 
-      if blk
-        self
+      if wait_for
+        StandardError === req ? raise(req) : req.data.count
       else
-        case req.data
-        when Rwrite then return req.data.data
-        when ErrorPayload then raise WriteError.new(req.data, path)
-        else raise TypeError.new(req)
-        end
+        self
       end
     end
 

@@ -11,6 +11,8 @@ module NonoP
                    [:value, :string, :size])
     calc_attr :size, lambda { value.bytesize }
 
+    delegate :blank?, :empty?, :each_char, :each_byte, to: :value
+    
     def initialize *opts
       super()
       case opts

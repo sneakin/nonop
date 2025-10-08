@@ -6,9 +6,12 @@ module NonoP
   end
 
   class ProtocolError < Error
+    attr_reader :code, :sys
+    
     def initialize err, msg = nil
-      sys = SystemCallError.new(msg, Integer === err ? err : err.code)
-      super(sys.message)
+      @code = err
+      @sys = SystemCallError.new(msg, Integer === err ? err : err.code)
+      super(@sys.message)
     end
   end
 

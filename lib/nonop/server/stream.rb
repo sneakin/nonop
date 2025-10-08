@@ -4,6 +4,14 @@ using SG::Ext
 module NonoP::Server
   class Stream
     # @abstract
+    # @return [Qid]
+    def qid
+      @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:FILE],
+                              version: 0,
+                              path: hash)
+    end
+
+    # @abstract
     # @return [self]
     def close
       @closed = true

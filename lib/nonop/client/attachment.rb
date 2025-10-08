@@ -9,7 +9,7 @@ module NonoP
     attr_reader :qid, :client
     attr_reader :fid, :afid, :uname, :n_uname, :aname
 
-    def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, &blk
+    def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, wait_for: false, &blk
       @client = client
       @fid = fid || client.next_fid
       @afid = afid || -1
@@ -21,7 +21,8 @@ module NonoP
                                  afid: @afid,
                                  uname: NonoP::NString.new(uname),
                                  aname: NonoP::NString.new(aname),
-                                 n_uname: n_uname)) do |pkt|
+                                 n_uname: n_uname),
+                     wait_for: wait_for || blk == nil) do |pkt|
         case pkt
         when ErrorPayload then raise AttachError.new(pkt)
         when Rattach then
@@ -37,9 +38,9 @@ module NonoP
       @ready
     end
 
-    def close &blk
+    def close wait_for: false, &blk
       @ready = false
-      client.clunk(@fid, &blk)
+      client.clunk(@fid, wait_for:, &blk)
       self
     end
 
@@ -95,7 +96,7 @@ module NonoP
       result = client.request(NonoP::Twalk.new(fid: fid || self.fid,
                                                newfid: nfid,
                                                wnames: path.collect { NonoP::NString.new(_1) }),
-                              wait_for: wait_for) do |pkt|
+                              wait_for: wait_for || blk == nil) do |pkt|
         case pkt
         when Rwalk then
           client.track_fid(nfid)
