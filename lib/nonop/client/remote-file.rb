@@ -85,26 +85,23 @@ module NonoP
     end
 
     def close &blk
-      @io.close(&blk)
+      r = @io.close(&blk)
       @ready = false
-      self
+      r
     end
 
     # todo length limited to msglen
     # todo handling multiple replies for big reads
     def read length, offset: 0, &blk
-      r = @io.read(length, offset:, &blk)
-      retself(r, @io)
+      @io.read(length, offset:, &blk)
     end
 
     def write data, offset: 0, length: nil, &blk
-      r = @io.write(data, offset:, length:, &blk)
-      retself(r, @io)
+      @io.write(data, offset:, length:, &blk)
     end
 
     def write_one data, offset: 0, &blk
-      r = @io.write_one(data, offset:, &blk)
-      retself(r, @io)
+      @io.write_one(data, offset:, &blk)
     end
 
     def wrap_error_or_data pkt, error = Error

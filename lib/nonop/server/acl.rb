@@ -1,11 +1,19 @@
 module NonoP::Server
   class ACL
+    def auth? export: nil, user: nil, uid: nil, remote_addr: nil, **opts
+      false
+    end
+    
     def attach? export, user: nil, uid: nil, remote_addr: nil, **opts
       false
     end
   end
 
   class YesAcl < ACL
+    def auth? export: nil, user: nil, uid: nil, remote_addr: nil, **opts
+      true
+    end
+
     def attach? export, user: nil, uid: nil, remote_addr: nil, **opts
       true
     end
@@ -16,8 +24,15 @@ module NonoP::Server
       @db = db
     end
 
+    def auth? export: nil, user: nil, uid: nil, remote_addr: nil, **opts
+      fs = @db.fetch('auth').fetch(export)
+      fs[user] || fs[uid]
+    rescue KeyError
+      false
+    end
+
     def attach? export, user: nil, uid: nil, remote_addr: nil, **opts
-      fs = @db.fetch(export)
+      fs = @db.fetch('attach').fetch(export)
       fs[user] || fs[uid]
     rescue KeyError
       false

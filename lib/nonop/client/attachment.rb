@@ -21,27 +21,25 @@ module NonoP
                                  afid: @afid,
                                  uname: NonoP::NString.new(uname),
                                  aname: NonoP::NString.new(aname),
-                                 n_uname: n_uname),
-                     wait_for: wait_for || blk == nil) do |pkt|
+                                 n_uname: n_uname)) do |pkt|
         case pkt
-        when ErrorPayload then raise AttachError.new(pkt)
+        when ErrorPayload then raise (@afid != -1 ? AuthError : AttachError).new(pkt)
         when Rattach then
           client.track_fid(@fid)
           @qid = pkt.aqid
           @ready = true
           blk&.call(self)
         end
-      end
+      end.skip_unless(wait_for).wait
     end
 
     def ready?
       @ready
     end
 
-    def close wait_for: false, &blk
+    def close &blk
       @ready = false
-      client.clunk(@fid, wait_for:, &blk)
-      self
+      client.clunk(@fid, &blk)
     end
 
     def open *a, **o, &blk
@@ -56,47 +54,38 @@ module NonoP
 
     def getattr(path, fid: nil, &blk)
       nfid ||= client.next_fid
-      result = nil
-      walk(path, fid: fid, nfid: nfid, wait_for: blk == nil) do |walk|
+      walk(path, fid: fid, nfid: nfid) do |walk|
         if StandardError === walk
           return NonoP.maybe_call(blk, walk)
         else
-           result = client.request(NonoP::L2000::Tgetattr.new(fid: nfid),
-                                  wait_for: blk == nil) do |pkt|
+          client.request(NonoP::L2000::Tgetattr.new(fid: nfid)) do |pkt|
             client.clunk(nfid)
-            blk&.call(NonoP.maybe_wrap_error(pkt, GetAttrError))
-          end
+            NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, GetAttrError))
+          end.skip_unless(blk == nil).wait
         end
-      end
-
-      blk ? self : result.data
+      end.skip_unless(blk == nil).wait
     end
 
     def stat(path, fid: nil, &blk)
       nfid ||= client.next_fid
-      result = nil
-      walk(path, fid: fid, nfid: nfid, wait_for: blk == nil) do |walk|
+      walk(path, fid: fid, nfid: nfid) do |walk|
         if StandardError === walk
           return NonoP.maybe_call(blk, walk)
         else
-          result = client.request(NonoP::Tstat.new(fid: nfid),
-                                  wait_for: blk == nil) do |pkt|
+          client.request(NonoP::Tstat.new(fid: nfid)) do |pkt|
             client.clunk(nfid)
             blk&.call(NonoP.maybe_wrap_error(pkt, StatError))
-          end
+          end.skip_unless(blk == nil).wait
         end
-      end
-
-      blk ? self : result.data
+      end.skip_unless(blk == nil).wait
     end
 
-    def walk path, nfid: nil, fid: nil, wait_for: nil, &blk
+    def walk path, nfid: nil, fid: nil, &blk
       nfid ||= client.next_fid
       path = RemotePath.new(path) unless RemotePath === path
-      result = client.request(NonoP::Twalk.new(fid: fid || self.fid,
-                                               newfid: nfid,
-                                               wnames: path.collect { NonoP::NString.new(_1) }),
-                              wait_for: wait_for || blk == nil) do |pkt|
+      client.request(NonoP::Twalk.new(fid: fid || self.fid,
+                                      newfid: nfid,
+                                      wnames: path.collect { NonoP::NString.new(_1) })) do |pkt|
         case pkt
         when Rwalk then
           client.track_fid(nfid)
@@ -107,8 +96,6 @@ module NonoP
           next NonoP.maybe_call(blk, TypeError.new(pkt.class))
         end
       end
-
-      blk ? self : result.data
     end
   end
 

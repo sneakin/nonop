@@ -48,39 +48,32 @@ module NonoP
       count ||= READ_SIZE
 
       Async.reduce(0.upto(MAX_U64), offset || 0) do |n, offset, &cc| 
-       readdir(count, offset, wait_for:) do |dir|
+        readdir(count, offset) do |dir|
           if StandardError === dir
             cc.call(dir, offset)
           else
             dir.entries.each(&blk)
             cc.call(dir.entries.size < count, offset + dir.entries.size)
           end
-        end
+        end.skip_unless(wait_for).wait
       end
     end
 
-    def readdir count, offset = 0, wait_for: nil, &blk
+    def readdir count, offset = 0, &blk
       client.request(NonoP::L2000::Treaddir.new(fid: fid,
                                                 offset: offset,
-                                                count: count),
-                     wait_for: wait_for || blk == nil) do |result|
-        blk.call(NonoP.maybe_wrap_error(result, ReadError))
+                                                count: count)) do |result|
+        NonoP.maybe_call(blk, NonoP.maybe_wrap_error(result, ReadError))
       end
     end
 
-    def mkdir path, mode: nil, gid: nil, wait_for: nil, &blk
-      result = client.request(NonoP::L2000::Tmkdir.
-                              new(dfid: fid,
-                                  name: NString.new(path.to_str),
-                                  mode: mode || 0755, \
-                                  gid: gid || Process.gid),
-                              wait_for: wait_for || blk == nil) do |pkt|
-        blk&.call(NonoP.maybe_wrap_error(pkt, MkdirError))
-      end
-      if blk
-        self
-      else
-        NonoP.maybe_wrap_error(result.data, MkdirError)
+    def mkdir path, mode: nil, gid: nil, &blk
+      client.request(NonoP::L2000::Tmkdir.
+                     new(dfid: fid,
+                         name: NString.new(path.to_str),
+                         mode: mode || 0755,
+                         gid: gid || Process.gid)) do |pkt|
+        NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, MkdirError))
       end
     end
 
@@ -92,8 +85,8 @@ module NonoP
       attachment.stat(entry, &blk)
     end
 
-    def walk_to_self wait_for: false, &blk
-      attachment.walk(@path, nfid: @fid, wait_for:) do |pkt|
+    def walk_to_self &blk
+      attachment.walk(@path, nfid: @fid) do |pkt|
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
@@ -107,14 +100,13 @@ module NonoP
       end
     end
 
-    def open_self wait_for: nil, &blk
+    def open_self &blk
       return blk.call(self) if ready?
 
-      walk_to_self(wait_for:) do |pkt|
+      walk_to_self do |pkt|
         case pkt
         when Rwalk then
-          client.request(NonoP::L2000::Topen.new(fid: @fid, flags: @flags),
-                         wait_for:) do |pkt|
+          client.request(NonoP::L2000::Topen.new(fid: @fid, flags: @flags)) do |pkt|
             if ErrorPayload === pkt
               blk.call(NonoP.maybe_wrap_error(pkt, OpenError))
             else

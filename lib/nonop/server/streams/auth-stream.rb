@@ -34,22 +34,26 @@ module NonoP::Server
       data.size
     end
 
-    def authentic? uname = nil, uid = nil, data = nil
+    def authentic? uname = nil, uid = nil, credentials: nil, aname: nil
       NonoP.vputs {
         addr = begin
                  remote_addr.ip_address
                rescue
                  '---'
                end
-        [ "Authenticating #{addr} #{@user} #{@aname} #{@uid} #{uname} #{uid}", (data || @data).inspect, @environment.find_user(@uid).inspect ]
+        [ "Authenticating #{addr} #{user}/#{@user} #{aname}/#{@aname} #{uid}/#{@uid}", (credentials || @data).inspect, @environment.find_user(@uid).inspect ]
       }
-      (uname.blank? || @user == uname) &&
+      matches = (uname.blank? || @user == uname) &&
         (uid.blank? || @uid == uid) &&
-        @environment.authenticate(remote_addr: @remote_addr,
-                                  user: uname.blank?? @user : uname,
-                                  uid: uid || @uid,
-                                  credentials: data || @data)
-      # todo clear data?
+        (aname.blank? || @aname == aname)
+      return false unless matches
+      
+      authed = @environment.authenticate(remote_addr: @remote_addr,
+                                         user: uname.blank?? @user : uname,
+                                         uid: uid || @uid,
+                                         credentials: credentials.blank?? credentials : @data)
+      @data.clear
+      authed
     end
 
     def dup

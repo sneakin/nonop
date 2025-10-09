@@ -103,6 +103,7 @@ module NonoP
                       n_uname: uid,
                       credentials: auth_creds)
         end
+        NonoP.vputs { "CONNECTED" }
         self
       end
 

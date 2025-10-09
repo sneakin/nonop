@@ -6,13 +6,16 @@ require_relative 'client/attachment'
 
 module NonoP
   class Client
+    autoload :PendingRequest, 'nonop/client/pending-request'
+    autoload :PendingRequests, 'nonop/client/pending-request'
+    
     attr_reader :coder, :io, :server_info, :afid
     delegate :max_msglen, :max_msglen=, :max_datalen, to: :coder
 
     def initialize coder:, io:
       @coder = coder
       @io = io
-      @handlers = Hash.new { lambda { self.on_packet(_1) } }
+      @handlers = {}
       @next_tag = 0
       @next_fid = 0
       @afid = -1
@@ -36,22 +39,34 @@ module NonoP
       false
     end
 
-    def process_until tag: nil
-      @waiting_tags[tag] = true
+    def process_until tag: nil, tags: nil
+      tags ||= []
+      tags << tag if tag
+      result = pop_waiting_result(tags)
+      return result if result
+      
+      tags.each { @waiting_tags[_1] = true }
       @stop_loop = false
       begin
-        NonoP.vputs { "Processing until #{tag.inspect} #{@waiting_tags.size} #{@waiting_results.size}" }
         pkt = process_one
-      end until pkt.tag == tag || !@waiting_tags[tag] || @stop_loop || closed?
-      @waiting_results.delete(tag)
+      end until tags.include?(pkt.tag) || tags.any? { !@waiting_tags[_1] } || @stop_loop || closed?
+      tags.each { @waiting_tags.delete(_1) }
+
+      pop_waiting_result(tags)
     end
 
+    def pop_waiting_result tags
+      ready_tag = tags.find { @waiting_results[_1] }
+      [ ready_tag, @waiting_results.delete(ready_tag) ] if ready_tag
+    end
+    
     def process_one
       pkt = read_one
-      fn = @handlers[pkt.tag]
-      @handlers.delete(pkt.tag)
-      fn.call(pkt.data)
-      @waiting_results[pkt.tag] = pkt if @waiting_tags.delete(pkt.tag)
+      fn = @handlers.delete(pkt.tag) || method(:on_packet)
+      NonoP.vputs { "Processing #{pkt.tag}" }
+      ret = fn.call(pkt.data)
+      @waiting_results[pkt.tag] = ret if @waiting_tags.delete(pkt.tag)
+      NonoP.vputs { "Processed #{pkt.tag}" }
       pkt
     end
 
@@ -92,14 +107,15 @@ module NonoP
     def next_tag
       @next_tag = (@next_tag + 1) & 0xFFFF
     end
-
-    # todo ditch wait_for form a Request#wait
+    
+    # todo ditch wait_for form a PendingRequest#wait
     def request msg, wait_for: false, &handler
       tag = next_tag
-      add_handler(tag, handler) if handler
       pkt = NonoP::Packet.new(tag: tag, data: msg)
+      resp = PendingRequest.new(self, pkt, handler)
+      add_handler(tag, resp)
       send_one(pkt)
-      wait_for ? process_until(tag: tag) :  pkt
+      resp.skip_unless(wait_for).wait
     end
 
     def flush
@@ -124,9 +140,8 @@ module NonoP
 
     def start wait_for: false, &blk
       wait_for ||= blk == nil
-      result = request(Tversion.new(msize: max_msglen,
-                                    version: NString.new(@coder.version)),
-                       wait_for: wait_for) do |pkt|
+      request(Tversion.new(msize: max_msglen,
+                           version: NString.new(@coder.version))) do |pkt|
         case pkt
         when ErrorPayload then raise StartError.new(pkt)
         when Rversion then
@@ -137,8 +152,7 @@ module NonoP
           }
         end
         blk&.call(pkt)
-      end
-      wait_for ? result : self
+      end.skip_unless(wait_for).wait
     end
 
     def local_version
@@ -155,24 +169,22 @@ module NonoP
       # clunking the two fids, handing off to the kernel driver that
       # then attaching again with afid = -1.  The supplied block
       # should make the second attachment.
-      wait_for = wait_for || blk == nil
-      send_auth(uname:, aname:, n_uname:, credentials:, wait_for:) do |&cc|
+      wait_for ||= blk == nil
+      send_auth(uname:, aname:, n_uname:, credentials:) do |&cc|
         auth_attach(uname:, aname:, n_uname:, wait_for:) do |attachment|
           raise attachment if StandardError === attachment
-          attachment.close(wait_for:, &cc)
+          attachment.close(&cc).skip_unless(wait_for).wait
         end
-      end
+      end.skip_unless(wait_for).wait
     end
 
     def send_auth uname:, n_uname:, aname:, credentials: nil, wait_for: false, &blk
       NonoP.vputs { "Authenticating #{uname.inspect} #{n_uname.inspect}" }
       auth_fid = next_fid
-      wait_for ||= blk == nil
       result = request(L2000::Tauth.new(afid: auth_fid,
                                         uname: NString.new(uname),
                                         aname: NString.new(aname),
-                                        n_uname: n_uname),
-                       wait_for:) do |pkt|
+                                        n_uname: n_uname)) do |pkt|
         case pkt
         when ErrorPayload then raise AuthError.new(pkt)
         when Rauth then
@@ -181,38 +193,34 @@ module NonoP
           if credentials
             # write credentials to afid
             io = RemoteIO.new(self, auth_fid, 'auth')
-            io.write(credentials, wait_for:) do |reply|
-              raise reply if StandardError === reply
-              blk ? blk.call { io.close(wait_for:) } : io.close(wait_for:)
-            end
+            io.write(credentials) do |total, errs|
+              NonoP.vputs { "SENT AUTH: #{total} #{errs&.size}" }
+              raise errs[0] unless errs == nil || errs.empty?
+              blk ? blk.call { io.close.wait } : io.close.wait
+            end.wait
           else
             blk&.call
           end
         else raise TypeError.new("Expected Rauth, not #{pkt}")
         end
-      end
-
-      wait_for ? result : self
+      end.skip_unless(wait_for).wait
     end
 
     def clunk fid, wait_for: nil, &blk
       NonoP.vputs { "Clunking #{fid}" }
       free_fid(fid) # todo call this? default calls back.
-      wait_for ||= blk == nil
-      result = request(NonoP::Tclunk.new(fid: fid),
-                       wait_for:) do |reply|
+      request(NonoP::Tclunk.new(fid: fid)) do |reply|
         NonoP.vputs { "Clunked #{fid}" }
         case reply
         when ErrorPayload then NonoP.maybe_call(blk, NonoP.maybe_wrap_error(reply, ClunkError))
         when Rclunk then NonoP.maybe_call(blk, reply)
         else raise TypeError.new(reply.class)
         end
-      end
-
-      wait_for ? result : self
+      end.skip_unless(wait_for).wait
     end
 
     def attach(**opts, &blk)
+      # todo #wait
       Attachment.new(**opts.merge(client: self), &blk)
     end
 

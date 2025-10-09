@@ -112,6 +112,7 @@ class LsCommand < NonoP::Command::Client
   end
 
   def print_dirent ent, stats, max_name
+    NonoP.vputs { "Dirent #{ent.name} #{stats.inspect}" }
     if RuntimeError === stats
       puts("  \e[1m%-*s\e[0m %s" %
            [ max_name, ent.name.to_s, stats ])

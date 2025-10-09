@@ -49,7 +49,10 @@ class PutCommand < NonoP::Command::Client
         block_size = client.server_info[:msize] - NonoP::Decoder::MIN_MSGLEN
       end
 
-      put(reader, arguments[0])
+      put(reader, arguments[0]) do |total, offset|
+        client.close
+        puts("Wrote %i bytes." % [ total ])
+      end
     end
   end
 
@@ -61,25 +64,16 @@ class PutCommand < NonoP::Command::Client
       attachment.open(target, gid: gid, flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
         raise file if RuntimeError === file
 
-        NonoP::Async.reduce(reader, 0, write_offset, false) do |data_block, count, offset, err, &cc|
-          NonoP.vputs { "Writing #{file.class} #{data_block&.bytesize || 'nil'} #{offset} #{count}" }
-          file.write(data_block, offset: offset) do |reply|
-            if nil == reply
-              cc.call(true, count, offset, false, &method(:finish))
-            elsif RuntimeError === reply
-              cc.call(reply, count, offset, true, &method(:finish))
-            else
-              if data_block.bytesize < block_size
-                file.close
-              end
-
-              cc.call(data_block.bytesize < block_size,
-                      count + reply,
-                      offset + reply,
-                      reply < data_block.size, &method(:finish))
-            end
+        acc = reader.reduce([0, write_offset]) do |(total, offset), data_block|
+          if data_block
+            count = file.write(data_block, offset: offset)
+            [ total + count, offset + count ]
+          else
+            [ total, offset ]
           end
         end
+
+        yield(*acc)
       end
     end
   end    
@@ -92,20 +86,9 @@ class PutCommand < NonoP::Command::Client
       begin
         data = io.read(block_size)
         y << data
-      end until data.empty?
-      raise StopIteration
+      end until data == nil || data.empty?
     rescue IOError
-      raise StopIteration
-    end
-  end
-  
-  def finish status, count, offset, err
-    client.close
-    if RuntimeError === status
-      $stderr.puts("Error #{status.message}", *status.backtrace)
-      exit(-1) if err
-    else
-      NonoP.vputs("ALL DONE")
+      return nil
     end
   end
   
