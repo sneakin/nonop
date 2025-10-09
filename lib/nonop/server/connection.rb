@@ -16,13 +16,16 @@ module NonoP::Server
     attr_reader :output
     # @return [Environment]
     attr_reader :environment
-
+    # @return [IPAddress]
+    attr_reader :remote_address
+    
     delegate :acl, to: :environment
     
     # @param io [IO]
     # @param env [Environment]
     def initialize io, env
       @io = io
+      @remote_address = @io.remote_address.dup
       @environment = env
       @coder = NonoP::L2000::Decoder.new
       @output = SG::IO::Reactor::QueuedOutput.new(@io)
@@ -41,12 +44,6 @@ module NonoP::Server
       super
     end
 
-    def remote_address
-      @io.remote_address
-    rescue IOError, TypeError
-      nil
-    end
-    
     # @return [self]
     def close
       puts("Closing #{self} #{closed?}")
@@ -126,11 +123,11 @@ module NonoP::Server
       # the connection using uid and credentials followed an attach w/
       # blank uname and uid. Then then hand off sending 9p's version &
       # attach.
-      if acl.auth?(user: pkt.data.uname.to_s,
-                   uid: pkt.data.n_uname,
+      user = environment.find_user(pkt.data.n_uname)
+      if acl.auth?(user: user,
                    export: pkt.data.aname.to_s,
-                   rewote_address: remote_address)
-        @open_fids[pkt.data.afid] = AuthStream.new(environment, pkt.data, remote_addr: remote_address)
+                   remote_address: remote_address)
+        @open_fids[pkt.data.afid] = AuthStream.new(environment, pkt.data, remote_address: remote_address)
         reply_to(pkt, NonoP::L2000::Rauth.new(aqid: environment.auth_qid))
       else
         reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
@@ -142,62 +139,74 @@ module NonoP::Server
       # todo the afid should tie the user to the export via fid
       # cloning but the legacy auth bypasses with afid=-1 on a per
       # user basis
+      return on_legacy_auth(pkt) if pkt.data.afid == 0xFFFFFFFF
+        
       stream = nil
       begin
         stream = @open_fids.fetch(pkt.data.afid)
       rescue KeyError
-        if pkt.data.afid == 0xFFFFFFFF # todo && no auth?
-          return on_legacy_auth(pkt)
-        else
-          return reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
-        end
+        return reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
       end
       
       aname = pkt.data.aname.to_s
+      user = pkt.data.uname.to_s unless pkt.data.uname.blank?
+      uid = pkt.data.n_uname
       
-      if stream.authentic?(pkt.data.uname.to_s, pkt.data.n_uname,
-                           aname: aname) &&
+      if stream.authentic?(user, uid, aname: aname) &&
           acl.attach?(aname,
                       user: stream.user,
-                      uid: stream.uid,
-                      remote_addr: remote_address)
+                      remote_address: remote_address)
+        NonoP.vputs { "Authenticated #{stream.uname}/#{user} #{stream.uid}/#{uid} #{aname}" }
         # todo get export via the stream?
         fs = environment.get_export(aname)
         # Tauth allows future Tattach for aname by user
         @authorized_anames[aname] ||= []
-        @authorized_anames[aname] << stream.uid
+        @authorized_anames[aname] << stream.user
         @open_fids[pkt.data.fid] = stream = AttachStream.new(fs, pkt.data.fid)
         reply_to(pkt, NonoP::L2000::Rattach.new(aqid: stream.qid))
       else
-        @authorized_anames[aname]&.delete(stream.uid)
+        NonoP.vputs { "Failed authenticating #{stream.uname}/#{user} #{stream.uid}/#{uid} #{aname}" }
         reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
       end
     rescue KeyError
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::ENOENT))
     end
 
+    def can_attach_as? aname, who
+      @authorized_anames[aname]&.any? { |u|
+        acl.attach_as?(aname, user: u, as: who, remote_address: remote_address)
+      }
+    end
+    
     # @return [void]
     def on_legacy_auth pkt
       # does -1 uid == anon?
+      # todo refuse anon access?
 
       # A mount -t 9p: uses uname='', uid
-      # todo auth against per export databases
-      # manual also says afid ~0 means no auth
-      user = pkt.data.uname.to_s if !pkt.data.uname.blank?
+      # todo manual also says afid ~0 means no auth
+      uname = pkt.data.uname.to_s if !pkt.data.uname.blank?
       uid = pkt.data.n_uname
       aname = pkt.data.aname.to_s if !pkt.data.aname.blank?
-      NonoP.vputs { "Legacy Authenticating #{user.inspect} #{uid} #{aname}" }
+      fs = environment.get_export(aname)
+      passed = !environment.needs_prior_auth?
+      user = nil
+      
+      # diod likes to only send uname on a second Tattach where
+      # it uses afid=~0, uid=~0 and uname.  More Tattachs are sent
+      # when a new system user accesses: afid=~0, uid, uname=''
+      unless passed
+        user = environment.find_user(uid) if uid != 0xFFFFFFFF # masquerade
+        user ||= environment.find_user(uname)
+        passed = can_attach_as?(aname, user)
+      end
+      
+      NonoP.vputs { "Legacy Authenticating #{uname.inspect} #{uid} #{aname} #{user} => #{passed}" }
 
-      if (!environment.needs_auth? || @authorized_anames[aname]&.include?(uid)) &&
-          acl.attach?(pkt.data.aname.to_s,
-                      user: user,
-                      uid: uid,
-                      remote_addr: remote_address)
-        fs = environment.get_export(pkt.data.aname.to_s)
+      if passed
         @open_fids[pkt.data.fid] = stream = AttachStream.new(fs, pkt.data.fid)
         reply_to(pkt, NonoP::L2000::Rattach.new(aqid: stream.qid))
       else
-        # todo refuse anon access?
         reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EACCES))
       end
     rescue KeyError

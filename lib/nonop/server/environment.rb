@@ -7,18 +7,18 @@ module NonoP::Server
     attr_reader :authsrv, :auth_qid, :acl
     attr_reader :exports, :connections
 
-    def initialize reactor:, authsrv: nil, acl: nil, needs_auth: true
+    def initialize reactor:, authsrv: nil, acl: nil, needs_prior_auth: true
       @reactor = reactor
       @authsrv = authsrv
       @acl = acl || YesAcl.new
       @exports = {}
-      @auth_qid = NonoP::Qid.new(type: NonoP::Qid::Types[:AUTH], version: 0, path: '')
+      @auth_qid = NonoP::Qid.new(type: NonoP::Qid::Types[:AUTH], version: 0, path: 'auth')
       @started_at = Time.now
       @connections = {}
-      @needs_auth = needs_auth
+      @needs_prior_auth = needs_prior_auth
     end
 
-    def needs_auth?; @needs_auth; end
+    def needs_prior_auth?; @needs_prior_auth; end
 
     def export name, fs
       @exports[name] = fs

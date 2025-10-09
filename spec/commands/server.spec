@@ -57,7 +57,7 @@ describe 'nonop server' do
         describe "as #{user}" do
           let(:auth_creds) { 'YES' }
 
-          describe 'ctl' do
+          describe 'for ctl' do
             raises_when(!can_auth_ctl, NonoP::AuthError) do
               client.auth(uname: user,
                           aname: 'ctl',
@@ -65,7 +65,7 @@ describe 'nonop server' do
                           credentials: auth_creds)
             end
           end
-          describe 'spec' do
+          describe 'for spec' do
             raises_when(!can_auth_spec, NonoP::AuthError) do
               client.auth(uname: user,
                           aname: 'spec',
@@ -89,10 +89,12 @@ describe 'nonop server' do
          [ 'alice', 0xBAD, false, false ],
          [ 'root', 0, false, false ]
         ].each do |(user, uid, can_attach_ctl, can_attach_spec)|
-          describe "attaching as #{user} #{uid}" do
+          describe "attaching as #{user} #{uid.inspect}" do
             let(:auth_creds) { 'YES' }
 
-            describe 'spec' do
+            # todo uid=~0
+            
+            describe 'on spec' do
               raises_when(!can_attach_spec, NonoP::AttachError) do
                 client.attach(uname: user,
                               n_uname: uid || 0,
@@ -100,7 +102,42 @@ describe 'nonop server' do
                               wait_for: true)
               end
             end
-            describe 'ctl' do
+            describe 'on ctl' do
+              raises_when(!can_attach_ctl, NonoP::AttachError) do
+                client.attach(uname: user,
+                              n_uname: uid || 0,
+                              aname: 'ctl',
+                              wait_for: true)
+              end
+            end
+          end
+        end
+      end
+
+      describe "authorized against ctl as root" do
+        before do
+          client.auth(uname: 'root',
+                      aname: 'ctl',
+                      n_uname: 0,
+                      credentials: auth_creds)
+        end
+        
+        [[ YOU, Process.uid, true, false ],
+         [ 'alice', 0xBAD, true, false ],
+         [ 'root', 0, true, false ]
+        ].each do |(user, uid, can_attach_ctl, can_attach_spec)|
+          describe "attaching as #{user} #{uid.inspect}" do
+            let(:auth_creds) { 'YES' }
+
+            describe 'on spec' do
+              raises_when(!can_attach_spec, NonoP::AttachError) do
+                client.attach(uname: user,
+                              n_uname: uid || 0,
+                              aname: 'spec',
+                              wait_for: true)
+              end
+            end
+            describe 'on ctl' do
               raises_when(!can_attach_ctl, NonoP::AttachError) do
                 client.attach(uname: user,
                               n_uname: uid || 0,

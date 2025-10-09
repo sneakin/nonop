@@ -6,19 +6,20 @@ require_relative '../stream'
 module NonoP::Server
   class AuthStream < Stream
     attr_reader :environment
-    attr_reader :user
+    attr_reader :uname
     attr_reader :uid
     attr_reader :aname
-    attr_reader :remote_addr
+    attr_reader :remote_address
     attr_reader :data
+    attr_reader :user
     
-    def initialize environment, pkt = nil, user: nil, uid: nil, aname: nil, data: nil, remote_addr: nil
+    def initialize environment, pkt = nil, uname: nil, uid: nil, aname: nil, data: nil, remote_address: nil
       @environment = environment
-      @user = user || pkt&.uname&.to_s
-      @user = nil if @user.blank?
+      @uname = uname || pkt&.uname&.to_s
+      @uname = nil if @uname.blank?
       @uid = uid || pkt&.n_uname
       @aname = aname || pkt&.aname&.to_s
-      @remote_addr = remote_addr
+      @remote_address = remote_address
       @data = data || ''
     end
 
@@ -37,28 +38,30 @@ module NonoP::Server
     def authentic? uname = nil, uid = nil, credentials: nil, aname: nil
       NonoP.vputs {
         addr = begin
-                 remote_addr.ip_address
+                 remote_address.ip_address
                rescue
                  '---'
                end
-        [ "Authenticating #{addr} #{user}/#{@user} #{aname}/#{@aname} #{uid}/#{@uid}", (credentials || @data).inspect, @environment.find_user(@uid).inspect ]
+        [ "Authenticating #{addr} #{uname}/#{@uname} #{aname}/#{@aname} #{uid}/#{@uid}", (credentials || @data).inspect, @environment.find_user(@uid).inspect ]
       }
-      matches = (uname.blank? || @user == uname) &&
+      matches = (uname.blank? || @uname == uname) &&
         (uid.blank? || @uid == uid) &&
         (aname.blank? || @aname == aname)
       return false unless matches
       
-      authed = @environment.authenticate(remote_addr: @remote_addr,
-                                         user: uname.blank?? @user : uname,
-                                         uid: uid || @uid,
-                                         credentials: credentials.blank?? credentials : @data)
+      @user = @environment.
+        authenticate(remote_address: @remote_address,
+                     uname: uname.blank?? @uname : uname,
+                     uid: uid || @uid,
+                     credentials: credentials.blank?? @data : credentials)
       @data.clear
-      authed
+      @user
     end
 
     def dup
       self.class.new(environment, aname: @aname,
-                     user: @user, uid: @uid,
+                     uname: @uname, uid: @uid,
+                     remote_address: remote_address,
                      data: @data)
     end
   end

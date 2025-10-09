@@ -16,7 +16,7 @@ listen_on = nil
 port = 562
 auth_db_path = nil
 auth_provider = 'munge'
-needs_auth = true
+needs_prior_auth = true
 acl_path = 'YES'
 default_umask = File.umask
 reactor_timeout = 5 # secs
@@ -39,8 +39,8 @@ opts = OptionParser.new do |o|
   o.on('-l', '--listen HOST') do |v|
     listen_on = v
   end
-  o.on('--[no-]auth') do |v|
-    needs_auth = v
+  o.on('--[no-]prior-auth') do |v|
+    needs_prior_auth = v
   end
   o.on('--auth-provider PATH') do |v|
     auth_provider = v
@@ -85,9 +85,7 @@ end
 
 acl = case acl_path
       when /\.rb\Z/ then
-        Class.new(NonoP::Server::ACL) do
-          instance_eval(File.read(acl_path), acl_path)
-        end
+        NonoP::Server::ACL.from_script(acl_path)
       when /\.json\Z/ then NonoP::Server::HashAcl.new(JSON.load(File.read(acl_path)))
       when 'YES' then NonoP::Server::YesAcl.new
       else raise ArgumentError.new("Unknown ACL: #{acl_path}")
@@ -103,7 +101,7 @@ srvenv = NonoP::Server::Environment.
   new(reactor: reactor,
       authsrv: auth,
       acl: acl,
-      needs_auth: needs_auth)
+      needs_prior_auth: needs_prior_auth)
 
 require 'tempfile'
 scratch_file = Tempfile.new
