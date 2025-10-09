@@ -14,6 +14,7 @@ class PutCommand < NonoP::Command::Client
     super
     @desc = 'Write a file to a file server.'
     @aname = '/'
+    @appending = false
     @block_size = 4096
     @write_offset = 0
     @write_limit = nil
@@ -38,6 +39,9 @@ class PutCommand < NonoP::Command::Client
       o.on('--limit INTEGER', Integer) do |v|
         @write_limit = v
       end
+      o.on('--append') do
+        @appending = true
+      end
     end
   end
 
@@ -61,7 +65,9 @@ class PutCommand < NonoP::Command::Client
     client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
       raise attachment if RuntimeError === attachment
 
-      attachment.open(target, gid: gid, flags: [:WRONLY, :TRUNC, :CREATE]) do |file|
+      flags = @appending ? [ :WRONLY, :APPEND ] : [:WRONLY, :TRUNC, :CREATE]
+      
+      attachment.open(target, gid: gid, flags:) do |file|
         raise file if RuntimeError === file
 
         acc = reader.reduce([0, write_offset]) do |(total, offset), data_block|
