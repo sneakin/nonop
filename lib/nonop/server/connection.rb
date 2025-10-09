@@ -25,7 +25,7 @@ module NonoP::Server
     # @param env [Environment]
     def initialize io, env
       @io = io
-      @remote_address = @io.remote_address.dup
+      @remote_address = @io.remote_address.inspect_sockaddr
       @environment = env
       @coder = NonoP::L2000::Decoder.new
       @output = SG::IO::Reactor::QueuedOutput.new(@io)
@@ -37,9 +37,7 @@ module NonoP::Server
 
     # @return [String]
     def to_s
-      "\#<%s %s:%s>" % [ self.class.name,
-                         remote_address&.ip_address || '<closed>',
-                         remote_address&.ip_port || '??' ]
+      "\#<%s %s>" % [ self.class.name, remote_address ]
     rescue StandardError
       super
     end
