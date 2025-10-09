@@ -84,11 +84,11 @@ describe 'nonop server' do
                       credentials: auth_creds)
         end
         
-        { YOU => [ Process.uid, true, false ],
-          'alice' => [ nil, false, false ],
-          'alice' => [ 0xBAD, false, false ],
-          'root' => [ 0, false, false ]
-        }.each do |user, (uid, can_attach_ctl, can_attach_spec)|
+        [[ YOU, Process.uid, true, false ],
+         [ 'alice', nil, false, false ],
+         [ 'alice', 0xBAD, false, false ],
+         [ 'root', 0, false, false ]
+        ].each do |(user, uid, can_attach_ctl, can_attach_spec)|
           describe "attaching as #{user} #{uid}" do
             let(:auth_creds) { 'YES' }
 
