@@ -167,13 +167,15 @@ module NonoP::Server
     # @param fsid [Integer]
     # @param data [String]
     # @param offset [Integer]
-    # @return [Integer]
+    # @yield [count]
+    # @yieldparam count [Integer]
+    # @return [Integer, void]
     # @raise SystemCallError
     # @raise KeyError
-    def write fsid, data, offset = 0
+    def write fsid, data, offset = 0, &cb
       id_data = fsids.fetch(fsid)
       raise Errno::EACCES unless id_data.writing?
-      id_data.write(data, offset)
+      id_data.write(data, offset, &cb)
     rescue KeyError
       raise Errno::EBADFD
     end

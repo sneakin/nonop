@@ -77,7 +77,7 @@ module NonoP
         if blk
           blk.call(NonoP.maybe_wrap_error(result, WriteError))
         else
-          result.count
+          ErrorPayload === result ? raise(result) : result.count
         end
       end
     end

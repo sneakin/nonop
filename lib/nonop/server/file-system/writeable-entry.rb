@@ -18,12 +18,14 @@ module NonoP::Server::FileSystem
 
     # @param data [String]
     # @param offset [Integer]
-    # @return [Integer]
+    # @yield [count]
+    # @yieldparam count [Integer]
+    # @return [Integer, void]
     # @raise SystemCallError
-    def write data, offset = 0
+    def write data, offset = 0, &blk
       n = super
       @cb&.call(self, data, offset)
-      n
+      NonoP.maybe_call(blk, n)
     end
   end
 end

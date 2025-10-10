@@ -57,9 +57,9 @@ module NonoP::Server::FileSystem
       # @abstract
       # @param count [Integer]
       # @param offset [Integer]
-      # @yield [void]
-      # @yieldreturn [String] Read data
-      # @return [String]
+      # @yield [data]
+      # @yieldparam data [String] Read data
+      # @return [void]
       # @raise SystemCallError
       def read count, offset = 0, &cb
         raise Errno::ENOTSUP
@@ -68,9 +68,11 @@ module NonoP::Server::FileSystem
       # @abstract
       # @param data [String]
       # @param offset [Integer]
-      # @return [Integer]
+      # @yield [count]
+      # @yieldparam count [Integer] Amount wrote
+      # @return [Integer, void]
       # @raise SystemCallError
-      def write data, offset = 0
+      def write data, offset = 0, &cb
         raise Errno::ENOTSUP
       end
 

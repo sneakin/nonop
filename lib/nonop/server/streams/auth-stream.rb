@@ -29,10 +29,10 @@ module NonoP::Server
                               path: [ hash ].pack('Q'))
     end
 
-    def write data, offset = 0
+    def write data, offset = 0, &cb
       raise EOFError.new if closed?
       @data[offset, data.size] = data
-      data.size
+      NonoP.maybe_call(cb, data.size)
     end
 
     def authentic? uname = nil, uid = nil, credentials: nil, aname: nil

@@ -71,9 +71,11 @@ module NonoP::Server
     # @abstract
     # @param data [String]
     # @param offset [Integer]
-    # @return [Integer]
+    # @yield [count]
+    # @yieldparam count [Integer]
+    # @return [Integer, void]
     # @raise SystemCallError
-    def write data, offset = 0
+    def write data, offset = 0, &cb
       raise Errno::ENOTSUP
     end
 

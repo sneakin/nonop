@@ -96,7 +96,9 @@ module NonoP::Server::FileSystem
     # @param fsid [Integer]
     # @param count [Integer]
     # @param offset [Integer]
-    # @return [String]
+    # @yield [data]
+    # @yieldparam data [String]
+    # @return [void]
     # @raise SystemCallError
     # @raise KeyError
     def read fsid, count, offset = 0, &cb
@@ -107,10 +109,12 @@ module NonoP::Server::FileSystem
     # @param fsid [Integer]
     # @param data [String]
     # @param offset [Integer]
-    # @return [Integer]
+    # @yield [count]
+    # @yieldparam count [Integer]
+    # @return [Integer, void]
     # @raise SystemCallError
     # @raise KeyError
-    def write fsid, data, offset = 0
+    def write fsid, data, offset = 0, &cb
       raise Errno::ENOTSUP
     end
 

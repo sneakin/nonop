@@ -215,7 +215,9 @@ module NonoP::Server
     # @return [void]
     def on_write pkt
       stream = @open_fids.fetch(pkt.data.fid)
-      reply_to(pkt, NonoP::Rwrite.new(count: stream.write(pkt.data.data, pkt.data.offset)))
+      stream.write(pkt.data.data, pkt.data.offset) do |count|
+        reply_to(pkt, NonoP::Rwrite.new(count: count))
+      end
     rescue KeyError
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
     rescue SystemCallError

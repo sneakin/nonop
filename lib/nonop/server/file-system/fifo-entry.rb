@@ -78,13 +78,15 @@ module NonoP::Server::FileSystem
 
     # @param data [String]
     # @param offset [Integer]
-    # @return [Integer]
+    # @yield [count]
+    # @yieldparam count [Integer]
+    # @return [Integer, void]
     # @raise SystemCallError
-    def write data, offset = 0
+    def write data, offset = 0, &blk
       @data.push(data)
       attrs[:mtime_sec] = Time.now
       @cb&.call(self, data, offset)
-      data.size # todo bytesize?
+      NonoP.maybe_call(blk, data.size)
     end
 
     # @return [Hash<Symbol, Object>]

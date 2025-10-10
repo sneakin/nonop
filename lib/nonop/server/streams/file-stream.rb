@@ -80,10 +80,12 @@ module NonoP::Server
 
     # @param data [String]
     # @param offset [Integer]
-    # @return [Integer]
+    # @yield [count]
+    # @yieldparam count [Integer]
+    # @return [Integer, void]
     # @raise SystemCallError
-    def write data, offset = 0
-      fs.write(fsid, data, offset)
+    def write data, offset = 0, &cb
+      fs.write(fsid, data, offset, &cb)
     end
 
     # @param path [String, RemotePath]

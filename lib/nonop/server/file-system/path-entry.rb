@@ -77,34 +77,55 @@ module NonoP::Server::FileSystem
 
       # @param count [Integer]
       # @param offset [Integer]
-      # @return [String]
+      # @return [void]
       # @raise SystemCallError
       def read count, offset = 0, &cb
         # fixme deadlock on pipes, the open may be the blocker
         # fixme unable to seek fifos
         raise TypeError.new('boom') if ENV['BOOM'] =~ /read/
-        SG::IO::Reactor::BasicInput.read(io) do
-          NonoP.vputs { "Reading #{count}@#{offset} From #{io}" }
-          io.seek(offset) unless appending?
-          io.read_nonblock(count).tap { cb&.call(_1) }
-        rescue EOFError
-          cb.call('')
-        rescue
-          if cb
-            cb.err!($!)
-          else
-            raise
+        NonoP.vputs { "Reading #{count}@#{offset} From #{io}" }
+        if cb
+          SG::IO::Reactor::BasicInput.read(io) do
+            io.seek(offset) unless appending?
+            io.read_nonblock(count).tap { cb&.call(_1) }
+          rescue EOFError
+            cb.call('')
+          rescue
+            if cb
+              cb.err!($!)
+            else
+              raise
+            end
           end
+        else
+          io.seek(offset) unless appending?
+          io.read(count)
         end
       end
 
       # @param data [String]
       # @param offset [Integer]
-      # @return [Integer]
+      # @yield [count]
+      # @yieldparam count [Integer]
+      # @return [void]
       # @raise SystemCallError
-      def write data, offset = 0
-        io.seek(offset) unless appending?
-        io.write(data)
+      def write data, offset = 0, &cb
+        NonoP.vputs { "Writing #{data.bytesize}@#{offset} to #{io}" }
+        if cb
+          SG::IO::Reactor::BasicOutput.write(io) do
+            io.seek(offset) unless appending?
+            io.write_nonblock(data).tap { cb&.call(_1) }
+          rescue
+            if cb
+              cb.err!($!)
+            else
+              raise
+            end
+          end
+        else
+          io.seek(offset) unless appending?
+          io.write(data)
+        end
       end
 
       # @param count [Integer]
