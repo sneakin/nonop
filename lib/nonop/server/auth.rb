@@ -1,10 +1,20 @@
 require 'sg/ext'
 using SG::Ext
 
+require 'nonop/unix'
+
 module NonoP::Server
   class AuthService
     class User
       attr_reader :name, :uid
+
+      def eql? other
+        self.class === other &&
+          name.eql?(other.name) &&
+          uid.eql?(other.uid)
+      end
+
+      alias == eql?
 
       def to_s
         "<%s name=%s uid=%s>" % [ self.class.name, name.inspect, uid.inspect ]
@@ -24,9 +34,9 @@ module NonoP::Server
 
     # @return [Boolean]
     def has_user? user
-      false
+      !!find_user(user)
     end
-
+    
     # @return [Integer]
     def user_count
       0
@@ -38,14 +48,6 @@ module NonoP::Server
       include SG::AttrStruct
       include SG::HashStruct
       attributes :name, :uid, :secret
-
-      def eql? other
-        self.class === other &&
-          name.eql?(other.name) &&
-          uid.eql?(other.uid)
-      end
-
-      alias == eql?
     end
 
     def initialize db
@@ -63,16 +65,12 @@ module NonoP::Server
     
     def find_user user
       case user
-      when self.class then @db[user.name]
+      when AuthService::User then @db[user.name]
       when String then @db[user]
       when Integer then @db.find { _2.uid == user }&.then { _2 }
       when nil then false
       else raise TypeError.new("User not a string or ID but a #{user.inspect}")
       end
-    end
-    
-    def has_user? user
-      find_user(user) != nil
     end
     
     def user_count
@@ -87,7 +85,29 @@ module NonoP::Server
   end
 
   # todo get users from system
-  class MungeAuth < AuthHash
+  class MungeAuth < AuthService
+    class User < AuthService::User
+      include SG::AttrStruct
+      include SG::HashStruct
+      attributes :name, :uid
+    end
+
+    attr_reader :passwd
+    
+    def initialize passwd: nil
+      @passwd = passwd || NonoP::Unix::Passwd.new
+    end
+    
+    def find_user user
+      case user
+      when AuthService::User then user
+      when String then User.new(*passwd.find_by(:name, user)&.pick(:name, :uid))
+      when Integer then n = user.to_i; User.new(*passwd.find_by(:uid, n)&.pick(:name, :uid))
+      when nil then false
+      else raise TypeError.new("User not a string or ID but a #{user.inspect}")
+      end
+    end
+    
     def authenticate remote_address: nil, uname: nil, uid: nil, credentials: nil
       rec = find_user(uid) || find_user(uname)
       return false unless rec

@@ -93,7 +93,7 @@ acl = case acl_path
 
 reactor = SG::IO::Reactor.new
 auth = case auth_provider
-       when 'munge' then NonoP::Server::MungeAuth.new(users)
+       when 'munge' then NonoP::Server::MungeAuth.new
        when 'yes' then NonoP::Server::YesAuth.new(users)
        else raise ArgumentError.new("Unknown auth provider: #{auth_provider}")
        end
