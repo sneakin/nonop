@@ -6,6 +6,8 @@
 *** Version/auth decoder: only accepts those packets and upgrades the decoder
 *** Separate client and server decoders: client rejects T messages, server rejects R messages
 ** Per export auth
+*** DONE Tauth allows Tattach
+*** DONE ACL hook
 ** Docs
 *** README
 *** Examples
@@ -40,7 +42,67 @@
 ** File system quirk hiding
 *** Temporary files for saves
 
+** Proxy to another server
+** Drop in embedded server
+
 * Bugs
+** TODO stray: ~Error on #<NonoP::Server::Connection [::ffff:127.0.0.1]:50988> TypeError: no implicit conversion of NonoP::Server::Connection into Integer~
+:LOGBOOK:
+- State "TODO"       from              [2025-10-10 Fri 04:42]
+:END:
 ** `..` walks up the dir tree...or is that Linux?
 ** Deadlock when exporting itself in the file system.
 ** Fifos
+
+** In the source
+#+NAME todos
+#+BEGIN_SRC shell :results output org
+grep --exclude \*~ -Hn -iE "todo|fixme" -r ./{bin,lib,spec} | sed -E -e 's/(.+):([0-9]+):(.*)\( +([@]?todo.*|fixme.*) +(.*) +\)/\4 \5 [[file:\1::\2]]/g' -e 's:[@]?todo:TODO:g' -e 's:[@]?fixme:FIXME:g' | tee >(wc -l)
+#+END_SRC
+
+#+RESULTS:
+#+begin_src org
+./bin/cat:40:    # TODO files with colons?
+./bin/cat:53:    # TODO move into RemoteFile?
+./bin/cat:59:        raise data if StandardError === data # TODO where is it handled?
+./lib/nonop/messages/2000L/readdir.rb:8:  module L2000 # TODO part of the base 9p?
+./lib/nonop/messages/create.rb:8:  # TODO 9p2000.u packet
+./lib/nonop/client/remote-dir.rb:44:    # TODO an async version to complement an enumerable; needs to pass a continuation to ~blk~
+./lib/nonop/client/remote-file.rb:93:    # TODO length limited to msglen
+./lib/nonop/client/remote-file.rb:94:    # TODO handling multiple replies for big reads
+./lib/nonop/client/remote-io.rb:22:    # TODO length limited to msglen
+./lib/nonop/client/remote-io.rb:23:    # TODO handling multiple replies for big reads
+./lib/nonop/server/auth.rb:87:  # TODO get users from system
+./lib/nonop/server/file-system/buffer-entry.rb:78:      NonoP.maybe_call(cb, data.size) # TODO bytesize?
+./lib/nonop/server/file-system/buffer-entry.rb:91:      @attrs = attrs.merge(new_attrs) # TODO be picky
+./lib/nonop/server/file-system/directory-entry.rb:100:      entries.values[offset, count] || [] # TODO cache in the DataProvider?
+./lib/nonop/server/file-system/fifo-entry.rb:105:      @attrs = attrs.merge(new_attrs) # TODO be picky
+./lib/nonop/server/file-system/path-entry.rb:39:        # TODO full mapping
+./lib/nonop/server/file-system/path-entry.rb:64:        # FIXME
+./lib/nonop/server/file-system/path-entry.rb:86:        # FIXME deadlock on pipes, the open may be the blocker
+./lib/nonop/server/file-system/path-entry.rb:87:        # FIXME unable to seek fifos
+./lib/nonop/server/file-system/path-entry.rb:144:    # TODO What happens if the io blocks? Ideally a reply finally gets sent when data is read w/o blocking any thing else.
+./lib/nonop/server/file-system/path-entry.rb:145:    # TODO Purely IO backed entries: open & close pose problems
+./lib/nonop/server/file-system/base.rb:121:    # TODO File stat structure insteadbof open hashes
+./lib/nonop/server/connection.rb:137:      # TODO the afid should tie the user to the export via fid
+./lib/nonop/server/connection.rb:158:        # TODO get export via the stream?
+./lib/nonop/server/connection.rb:182:      # TODO refuse anon access?
+./lib/nonop/server/connection.rb:185:      # TODO manual also says afid ~0 means no auth
+./lib/nonop/server/connection.rb:214:    # TODO async reply
+./lib/nonop/server/connection.rb:227:    # TODO async reply
+./lib/nonop/server/connection.rb:233:                  end.but!(SystemCallError) do |err| # FIXME not catching
+./lib/nonop/client.rb:111:    # TODO ditch wait_for form a PendingRequest#wait
+./lib/nonop/client.rb:211:      free_fid(fid) # TODO call this? default calls back.
+./lib/nonop/client.rb:223:      # TODO #wait
+./lib/nonop/decoder.rb:115:      # TODO any real need for Packet? Which of these is faster?
+./lib/nonop/decoder.rb:128:      # raise InvalidSize.new(len, max_msglen) if len === 0..max_msglen # TODO off by 1?
+./lib/nonop/qid.rb:11:    # TODO bitfield
+./lib/nonop/command.rb:100:          @auth_creds ||= Munge.encode(uid: uid) # TODO auth provider
+./lib/nonop.rb:1:# TODO have each type only handle @data?
+./lib/nonop.rb:2:# TODO much much; only decodes a failed mount
+./spec/commands/server.spec:9:# TODO shared secret auth instead of munge
+./spec/commands/server.spec:51:      # FIXME stop using the Yes backend to test bad users; only
+./spec/commands/server.spec:95:            # TODO uid=~0
+./spec/spec-helper.rb:30:    sleep(2) # FIXME need a signal of sorts
+42
+#+end_src
