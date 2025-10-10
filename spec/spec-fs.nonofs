@@ -10,7 +10,8 @@ def format_server_stats stats
 end
 
 NonoP::Server::HashFileSystem.
-  new(umask: default_umask,
+  new(name,
+      umask: default_umask,
       entries: {
         'welcome' => "Hello!\n",
         'scratch' => NonoP::Server::FileSystem::PathEntry.new('scratch', scratch_file.path, writeable: true),

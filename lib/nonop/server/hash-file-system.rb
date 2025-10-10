@@ -19,12 +19,22 @@ module NonoP::Server
     # @param entries [Hash<String, Object>, nil]
     # @param umask [Integer, nil]
     # @param writeable [Boolean]
-    def initialize root: nil, entries: nil, umask: nil, writeable: false
-      @root = root || FileSystem::DirectoryEntry.new('/', entries: entries, umask: umask, root: true, writeable: writeable)
+    def initialize name, root: nil, entries: nil, umask: nil, writeable: false
+      super(name)
+      @root = root || FileSystem::DirectoryEntry.
+        new(name,
+            entries: entries,
+            umask: umask,
+            root: true,
+            writeable: writeable)
       @next_id = 0
       @fsids = {}
     end
 
+    def info_hash
+      super.merge!(root: @root.info_hash)
+    end
+    
     # @param path [Array<String>, RemotePath]
     # @return [Qid]
     def qid_for path

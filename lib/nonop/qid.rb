@@ -8,6 +8,7 @@ module NonoP
   # @attr version [Integer]
   # @attr path [String]
   class Qid
+    # todo bitfield
     Types = {
       DIR: 0x80,
       APPEND: 0x40,
@@ -32,5 +33,9 @@ module NonoP
     #   @option hash type [Integer]
     #   @option hash version [Integer]
     #   @option hash path [String]
+
+    def to_s
+      "\#<Qid %x:%x:%.16x>" % [ type, version, path.unpack('Q')[0] || 0 ]
+    end
   end
 end

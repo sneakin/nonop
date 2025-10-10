@@ -96,6 +96,10 @@ module NonoP::Server::FileSystem
       @umask = umask || 0
     end
 
+    def info_hash
+      { kind: self.class.name, name: name, qid: qid, size: size }
+    end
+    
     # @return [Qid]
     def qid
       @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:FILE],

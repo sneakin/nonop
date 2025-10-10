@@ -5,6 +5,16 @@ require 'nonop/qid'
 
 module NonoP::Server::FileSystem
   class Base
+    attr_reader :name
+
+    def initialize name
+      @name = name
+    end
+    
+    def info_hash
+      { kind: self.class.name, qid: qid, name: name }
+    end
+    
     # @return [Qid]
     def qid
       @qid ||= NonoP::Qid.new(type: NonoP::Qid::Types[:MOUNT],

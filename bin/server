@@ -112,12 +112,20 @@ def format_server_stats stats
 end
 
 ctlfs = NonoP::Server::HashFileSystem.
-  new(umask: default_umask,
+  new('ctl', umask: default_umask,
       entries: {
         'README.md' => Pathname.new(__FILE__).parent.parent.join('README.md'),
         'info' => {
           'now' => lambda { Time.now },
           'stats' => lambda { format_server_stats(srvenv.stats) },
+          'exports' => NonoP::Server::FileSystem::DirectoryEntry.new('exports', umask: default_umask) do
+            srvenv.exports.reduce({}) do |acc, (name, ex)|
+              acc[name] = NonoP::Server::FileSystem::StaticEntry.new(name, umask: default_umask) do
+                ex.info_hash.to_json + "\n"
+              end
+              acc
+            end
+          end,
         },
         'config' => {
           'README' => "Configure the server by writing to these files.\n".freeze,
@@ -140,7 +148,8 @@ srvenv.export('ctl', ctlfs)
 exports.each do |name, (path, writeable)|
   fs = if path.directory?
          root = NonoP::Server::FileSystem::PathEntry.new('/', path, writeable: writeable)
-         NonoP::Server::HashFileSystem.new(umask: default_umask,
+         NonoP::Server::HashFileSystem.new(name,
+                                           umask: default_umask,
                                            root: root)
        elsif path.to_s =~ /\.(rb|nonofs)\Z/
          instance_eval(File.read(path), path.to_s)

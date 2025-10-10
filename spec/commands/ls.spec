@@ -64,7 +64,7 @@ EOT
 /:
   README.md          #{rm_size}  -r--r-----
   config             3           dr-xr-x---
-  info               2           dr-xr-x---
+  info               3           dr-xr-x---
 EOT
             end
           end
@@ -74,7 +74,7 @@ EOT
               expect(strip_escapes(io.read)).
                 to be_table_of(stats_table(<<-EOT))
 /:
-  info               2           dr-xr-x---
+  info               3           dr-xr-x---
   config             3           dr-xr-x---
   README.md          #{rm_size}  -r--r-----
 EOT
@@ -103,6 +103,7 @@ config:
   verbose
 bad:
 info:
+  exports
   now
   stats
 EOT

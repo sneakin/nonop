@@ -132,6 +132,10 @@ module NonoP::Server::FileSystem
       @writeable = writeable
     end
 
+    def info_hash
+      super.merge({ path: @path.to_s, writeable: writeable? })
+    end
+    
     def qid
       @qid ||= NonoP::Qid.new(type: path.directory? ? NonoP::Qid::Types[:DIR] : NonoP::Qid::Types[:FILE],
                               version: 0,
@@ -147,6 +151,11 @@ module NonoP::Server::FileSystem
       end
     end
 
+    # @return [Boolean]
+    def writeable?
+      !!@writeable
+    end
+    
     # @param p9_mode [NonoP::BitField::Instance]
     # @return [OpenedEntry]
     def open p9_mode

@@ -30,9 +30,11 @@ module NonoP::Server::FileSystem
     # @param name [String]
     # @param data [String, Proc]
     # @param umask [Integer, nil]
-    def initialize name, data, umask: nil
+    # @yield [void]
+    # @yieldreturn [String]
+    def initialize name, data = nil, umask: nil, &blk
       super(name, umask:)
-      @data = data
+      @data = data || blk
     end
 
     # @param p9_mode [NonoP::BitField::Instance]

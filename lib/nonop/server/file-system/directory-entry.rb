@@ -22,28 +22,40 @@ module NonoP::Server::FileSystem
       end
     end
 
-    # @return [Hash<String, Entry>]
-    attr_reader :entries
-
     # @param name [String]
     # @param entries [Hash<String, Object>, nil]
     # @param root [Boolean]
     # @param umask [Integer, nil]
     # @param writeable [Boolean]
-    def initialize name, umask: nil, entries: nil, root: false, writeable: false
+    def initialize name, umask: nil, entries: nil, root: false, writeable: false, &blk
       super(name, umask:)
       @is_root = root
       @writeable = writeable
-      @entries = Hash[(entries || {}).collect { |name, data|
-                        [ name,
-                          case data
-                          when Entry then data.tap { _1.umask = umask }
-                          when String then (data.frozen? ? StaticEntry : BufferEntry).new(name, data, umask: umask)
-                          when Pathname then PathEntry.new(name, data, umask: umask)
-                          when Hash then DirectoryEntry.new(name, entries: data, umask: umask)
-                          else StaticEntry.new(name, data, umask: umask)
-                          end
-                        ]}]
+      @entries = Hash[(entries || {}).
+                      collect { [ _1, make_entry(_1, _2) ]}]
+      @entry_generator = blk
+    end
+
+    def info_hash
+      super.merge!({writeable: writeable?,
+                     dynamic: @entry_generator != nil})
+    end
+    
+    def make_entry name, data
+      case data
+      when Entry then data.tap { _1.umask = umask }
+      when String then (data.frozen? ? StaticEntry : BufferEntry).new(name, data, umask: umask)
+      when Pathname then PathEntry.new(name, data, umask: umask)
+      when Hash then DirectoryEntry.new(name, entries: data, umask: umask)
+      else StaticEntry.new(name, data, umask: umask)
+      end
+    end
+    
+    # @return [Hash<String, Entry>]
+    def entries
+      ents = @entries
+      ents = ents.merge(Hash[@entry_generator.call]) if @entry_generator
+      ents
     end
 
     # @return [Boolean]
@@ -85,17 +97,18 @@ module NonoP::Server::FileSystem
     # @return [Array<Dirent>]
     # @raise SystemCallError
     def readdir count, offset = 0
-      @entries.values[offset, count] || []
+      entries.values[offset, count] || [] # todo cache in the DataProvider?
     end
 
     # @return [Hash<Symbol, Object>]
     # @raise SystemCallError
     def getattr
+      ents = entries
       NonoP::Server::FileSystem::DEFAULT_DIR_ATTRS.
         merge(qid: qid,
-              size: @entries.size,
+              size: ents.size,
               mode: NonoP::PermMode.new(writeable? ? :RWX : :RX).mask!(~umask) | :DIR,
-              blocks: @entries.empty?? 0 : (1 + @entries.size / NonoP::Server::FileSystem::BLOCK_SIZE))
+              blocks: ents.empty?? 0 : (1 + ents.size / NonoP::Server::FileSystem::BLOCK_SIZE))
     end
 
     # @param name [String]
@@ -105,7 +118,7 @@ module NonoP::Server::FileSystem
     # @return [OpenedEntry]
     def create name, flags, mode, gid
       raise Errno::ENOTSUP unless writeable?
-      ent = @entries[name] = BufferEntry.new(name, '', umask: umask)
+      ent = entries[name] = BufferEntry.new(name, '', umask: umask)
       attrs = {}
       attrs[:gid] = gid if gid
       attrs[:mode] = NonoP::PermMode.new(mode).mask!(~umask) | :FILE if mode
