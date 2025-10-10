@@ -44,12 +44,13 @@ module NonoP::Server::FileSystem
 
     # @param count [Integer]
     # @param offset [Integer]
-    # @return [String]
-    # @raise SystemCallError
+    # @yield [data]
+    # @yieldparam data [String]
+    # @yieldreturn [String]
+    # @return [String, void]
     def read count, offset = 0, &cb
-      return cb.call(read(count, offset)) if cb
       attrs[:atime_sec] = Time.now
-      data[offset, count]
+      NonoP.maybe_call(cb, data[offset, count])
     end
 
     # @param size [Integer]

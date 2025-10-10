@@ -27,13 +27,14 @@ module NonoP
                    [:version, :uint32l],
                    [:path, :string, 8])
 
-    # @!method initialize(*ary, **hash)
-    #   @param ary [Array]
-    #   @param hash [Hash<Symbol, Object>]
-    #   @option hash type [Integer]
-    #   @option hash version [Integer]
-    #   @option hash path [String]
+    # @!method initialize(*ary, **opts)
+    #   @param ary [Array(Integer, Integer, String)]
+    #   @param opts [Hash] Options
+    #   @option opts type [Integer]
+    #   @option opts version [Integer]
+    #   @option opts path [String]
 
+    # @return [String]
     def to_s
       "\#<Qid %x:%x:%.16x>" % [ type, version, path.unpack('Q')[0] || 0 ]
     end

@@ -77,7 +77,10 @@ module NonoP::Server::FileSystem
 
       # @param count [Integer]
       # @param offset [Integer]
-      # @return [void]
+      # @yield [data]
+      # @yieldparam data [String]
+      # @yieldreturn [String]
+      # @return [String, void]
       # @raise SystemCallError
       def read count, offset = 0, &cb
         # fixme deadlock on pipes, the open may be the blocker
@@ -107,7 +110,8 @@ module NonoP::Server::FileSystem
       # @param offset [Integer]
       # @yield [count]
       # @yieldparam count [Integer]
-      # @return [void]
+      # @yieldreturn [Integer]
+      # @return [Integer, void]
       # @raise SystemCallError
       def write data, offset = 0, &cb
         NonoP.vputs { "Writing #{data.bytesize}@#{offset} to #{io}" }

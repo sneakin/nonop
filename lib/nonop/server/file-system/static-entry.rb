@@ -18,7 +18,10 @@ module NonoP::Server::FileSystem
 
       # @param count [Integer]
       # @param offset [Integer]
-      # @return [String]
+      # @yield [data]
+      # @yieldparam data [String]
+      # @yieldreturn [String]
+      # @return [String, void]
       # @raise SystemCallError
       def read count, offset = 0, &cb
         return cb.call(read(count, offset)) if cb
@@ -28,7 +31,7 @@ module NonoP::Server::FileSystem
     end
 
     # @param name [String]
-    # @param data [String, Proc]
+    # @param data [String, Proc, nil]
     # @param umask [Integer, nil]
     # @yield [void]
     # @yieldreturn [String]
