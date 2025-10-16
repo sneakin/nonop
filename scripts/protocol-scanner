@@ -1,0 +1,168 @@
+#!/usr/bin/env -S bundle exec ruby
+# -*- mode: ruby -*-
+#
+# Scans diode's ~protocol.md~ extracting 9p's request and reply
+# message structures. These are turned into PackedStructs in the
+# {NonoP::Protocol::Messages} module.
+#
+
+require 'erb'
+require 'sg/ext'
+using SG::Ext
+
+FULL_ARGV = ARGV.dup
+
+class Request
+  attr_accessor :name, :fields
+  def initialize name, fields
+    @name = name
+    @fields = fields || []
+  end
+
+  def to_hash
+    { name:, fields: }
+  end
+
+  SizesToTypes = Hash.new { |h, k| k }.
+    merge!({ '1' => :uint8,
+             '2' => :uint16,
+             '4' => :uint32,
+             '8' => :uint64,
+             's' => String,
+             '*' => Array,
+             '13' => 'Qid'
+           })
+  
+  def self.from_string str
+    size, name, *fields = str.split
+    #scan(/(?:(\w+)(?:\[([^\]]*)\])?)|(?:(\w+)\*\(\w+\)\[(\w+)\])/).
+    fields = fields.collect do |f|
+      case f
+      when /\A(\w+)\*\((\w+)\[(\w+)\]\)/ then [ $2.to_sym, SizesToTypes[$3], $1.to_sym ]
+      when /\A(\w+)(?:\[([^\]]*)\])?/ then [ $1.to_sym, SizesToTypes[$2] ]
+      else $stderr.puts("WARNING Unknown field format: #{f}")
+      end
+    end
+    fields.delete(:tag)
+    self.new(name, fields)
+  end
+end
+
+class Definition
+  attr_accessor :request, :reply, :name, :doc, :enums
+  
+  def initialize name, doc
+    @name = name
+    @doc = doc
+    @doc = [ doc ]
+    @enums = Hash.new { _1[_2] = Hash.new }
+  end
+
+  def to_hash
+    { request:, reply:, doc:, name:, enums: }
+  end
+end
+
+preamble = []
+defs = []
+definition = nil
+
+ARGF.each_line do |line|
+  if !definition && line !~ /\A\#+ \w+ -+/
+    preamble << line.rstrip
+    next
+  end
+  
+  case line
+  when /\A#+ (Sample Session|References)/ then break
+  when
+    /\A\#define P9_(\w+)_([^_]+_SET)\s+(\S*)(.*)/,
+    /\A\#define P9_(GETATTR)_(\S+)\s+(\S*)(.*)/,
+    /\A\#define P9_(\w+)_(\S+)\s+(\S*)(.*)/
+  then
+    definition.doc << line.rstrip
+    definition.enums[$1][$2] = [ $3, $4 ]
+  when /\A#+ (\w+) -+ (.*)/ then defs << (definition = Definition.new($1, $2))
+  when /\A#+ (\w+, \w+) -+ (.*)/ then defs << (definition = Definition.new($1, $2))
+  when /\A```/ then true
+  when /\Asize\[4\] (T\w+)/ then definition.request = Request.from_string(line)
+  when /\Asize\[4\] (R\w+)/ then definition.reply = Request.from_string(line)
+  else definition.doc << line.rstrip if definition
+  end
+end
+
+def packing_for_fields fields
+  fields.collect do |f|
+    case f
+      in [ name, type ] then "[ :%s, %s%s ]" % [ name, type.to_s =~ /\A[A-Z]/ ? '' : ':', type ]
+      in [ name, type, size ] then "[ :%s, %s, %s%s ]" % [ name, type, size =~ /\A\d+\Z/ ? '' : ':', size ]
+    end
+  end
+end
+
+def word_wrap_lines lines, width: 72
+  lines.collect do |line|
+    next line if line.size < width
+    line.split.reduce([ '', [] ]) do |(last, lines), word|
+      if last.size + word.size < width
+        [ last + ' ' + word, lines ]
+      else
+        [ word, lines << last ]
+      end
+    end[1]
+  end.flatten
+end
+
+def word_wrap str, width: 72
+  word_wrap_lines(str.split("\n"), width:).join("\n")
+end
+
+req = ERB.new(<<-EOT, trim_mode: '-')
+  class <%= name %>
+    include PacketData
+    define_packing(<%= packing_for_fields(fields).join(",\n" + ' ' * 19) %>)
+  end
+EOT
+
+enum = ERB.new(<<-EOT, trim_mode: '-')
+  <%= name %> = {
+<% values.each do |name, (value, comment)| -%>
+    <%= name %>: <%= value %><% unless comment.blank? -%> # <%= comment %><% end -%>,
+<% end -%>
+  }
+EOT
+
+defsrc = ERB.new(<<-EOT, trim_mode: '-')
+  \# <%= name %>
+<%= word_wrap_lines(doc.reject(&:blank?)).collect { '  # ' + _1 }.join("\n") %>
+
+<% unless enums.empty? -%>
+<% enums.collect do |n, v| -%>
+<%= enum.result_with_hash(name: n, values: v) -%>
+
+<% end -%>
+<% end -%>
+<% if request -%>
+<%= req.result_with_hash(request.to_hash.merge(request: request)) -%>
+<% end -%>
+<% if reply -%>
+
+<%= req.result_with_hash(reply.to_hash.merge(request: request)) -%>
+<% end -%>
+EOT
+
+src = ERB.new(<<-EOT, trim_mode: '-')
+\# Auto-generated using `<%= cmd.join(' ') %>`
+\#
+<%= word_wrap_lines(preamble.reject(&:blank?)).collect { '# ' + _1 }.join("\n") %>
+
+module NonoP; module Protocol; end; end
+
+module NonoP::Protocol::Messages
+<% defs.collect do |d| -%>
+<%= defsrc.result_with_hash(d.to_hash) %>
+<% end -%>
+end
+EOT
+
+puts src.result_with_hash(preamble:, defs:, cmd: [ $0, *FULL_ARGV ])
