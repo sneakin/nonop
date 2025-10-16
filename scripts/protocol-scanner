@@ -28,9 +28,9 @@ class Request
              '2' => :uint16,
              '4' => :uint32,
              '8' => :uint64,
-             's' => String,
+             's' => 'NonoP::NString',
              '*' => Array,
-             '13' => 'Qid'
+             '13' => 'NonoP::Qid'
            })
   
   def self.from_string str
@@ -39,7 +39,8 @@ class Request
     fields = fields.collect do |f|
       case f
       when /\A(\w+)\*\((\w+)\[(\w+)\]\)/ then [ $2.to_sym, SizesToTypes[$3], $1.to_sym ]
-      when /\A(\w+)(?:\[([^\]]*)\])?/ then [ $1.to_sym, SizesToTypes[$2] ]
+      when /\A(\w+)(?:\[([^0-9s*]+)\])/ then [ $1.to_sym, :uint8, $2.to_sym ]
+      when /\A(\w+)(?:\[([^\]]*)\])?/ then [ $1.to_sym, SizesToTypes[$2 || '1'] ]
       else $stderr.puts("WARNING Unknown field format: #{f}")
       end
     end
@@ -81,7 +82,7 @@ ARGF.each_line do |line|
     /\A\#define P9_(\w+)_(\S+)\s+(\S*)(.*)/
   then
     definition.doc << line.rstrip
-    definition.enums[$1][$2] = [ $3, $4 ]
+    definition.enums[$1][$2] = [ $3.gsub(/(0x[0-9a-fA-F]+)[UL]+/, '\1'), $4 ]
   when /\A#+ (\w+) -+ (.*)/ then defs << (definition = Definition.new($1, $2))
   when /\A#+ (\w+, \w+) -+ (.*)/ then defs << (definition = Definition.new($1, $2))
   when /\A```/ then true
@@ -95,7 +96,7 @@ def packing_for_fields fields
   fields.collect do |f|
     case f
       in [ name, type ] then "[ :%s, %s%s ]" % [ name, type.to_s =~ /\A[A-Z]/ ? '' : ':', type ]
-      in [ name, type, size ] then "[ :%s, %s, %s%s ]" % [ name, type, size =~ /\A\d+\Z/ ? '' : ':', size ]
+      in [ name, type, size ] then "[ :%s, %s%s, %s%s ]" % [ name, type.to_s =~ /\A[A-Z]/ ? '' : ':', type, size =~ /\A\d+\Z/ ? '' : ':', size ]
     end
   end
 end
@@ -120,7 +121,7 @@ end
 
 req = ERB.new(<<-EOT, trim_mode: '-')
   class <%= name %>
-    include PacketData
+    include NonoP::Packet::Data
     define_packing(<%= packing_for_fields(fields).join(",\n" + ' ' * 19) %>)
   end
 EOT
@@ -128,7 +129,7 @@ EOT
 enum = ERB.new(<<-EOT, trim_mode: '-')
   <%= name %> = {
 <% values.each do |name, (value, comment)| -%>
-    <%= name %>: <%= value %><% unless comment.blank? -%> # <%= comment %><% end -%>,
+    <%= name %>: <%= value %>,<% unless comment.blank? -%> # <%= comment %><% end %>
 <% end -%>
   }
 EOT
