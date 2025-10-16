@@ -90,15 +90,11 @@ module NonoP::Server::FileSystem
         if cb
           SG::IO::Reactor::BasicInput.read(io) do
             io.seek(offset) unless appending?
-            io.read_nonblock(count).tap { cb&.call(_1) }
+            io.read_nonblock(count).tap { cb.call(_1) }
           rescue EOFError
             cb.call('')
           rescue
-            if cb
-              cb.err!($!)
-            else
-              raise
-            end
+            cb.err!($!)
           end
         else
           io.seek(offset) unless appending?
@@ -118,13 +114,9 @@ module NonoP::Server::FileSystem
         if cb
           SG::IO::Reactor::BasicOutput.write(io) do
             io.seek(offset) unless appending?
-            io.write_nonblock(data).tap { cb&.call(_1) }
+            io.write_nonblock(data).tap { cb.call(_1) }
           rescue
-            if cb
-              cb.err!($!)
-            else
-              raise
-            end
+            cb.err!($!)
           end
         else
           io.seek(offset) unless appending?
