@@ -103,13 +103,14 @@ end
 def word_wrap_lines lines, width: 72
   lines.collect do |line|
     next line if line.size < width
-    line.split.reduce([ '', [] ]) do |(last, lines), word|
+    last, lines = line.split.reduce([ '', [] ]) do |(last, lines), word|
       if last.size + word.size < width
         [ last + ' ' + word, lines ]
       else
         [ word, lines << last ]
       end
-    end[1]
+    end
+    lines << last
   end.flatten
 end
 
