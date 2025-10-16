@@ -1,6 +1,7 @@
 require 'sg/ext'
 using SG::Ext
 
+require_relative 'decoder'
 require_relative 'errors'
 require_relative 'client/attachment'
 

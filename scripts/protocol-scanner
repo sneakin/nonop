@@ -14,14 +14,16 @@ using SG::Ext
 FULL_ARGV = ARGV.dup
 
 class Request
-  attr_accessor :name, :fields
-  def initialize name, fields
+  attr_accessor :name, :fields, :raw_fields
+  
+  def initialize name, fields, raw_fields = nil
     @name = name
     @fields = fields || []
+    @raw_fields = raw_fields
   end
 
   def to_hash
-    { name:, fields: }
+    { name:, fields:, raw_fields: }
   end
 
   SizesToTypes = Hash.new { |h, k| k }.
@@ -35,7 +37,8 @@ class Request
            })
   
   def self.from_string str
-    size, name, *fields = str.split
+    raw_fields = str.split
+    size, name, *fields = raw_fields
     #scan(/(?:(\w+)(?:\[([^\]]*)\])?)|(?:(\w+)\*\(\w+\)\[(\w+)\])/).
     fields = fields.collect do |f|
       case f
@@ -46,7 +49,7 @@ class Request
       end
     end
     fields.delete_if { _1[0] == :tag }
-    self.new(name, fields)
+    self.new(name, fields, raw_fields)
   end
 end
 
@@ -127,6 +130,7 @@ def word_wrap str, width: 72
 end
 
 req = ERB.new(<<-EOT, trim_mode: '-')
+  \# Fields: <%= raw_fields.join(" ") %>
   class <%= name %>
     include NonoP::Packet::Data
     define_packing(<%= packing_for_fields(fields).join(",\n" + ' ' * 19) %>)
@@ -143,7 +147,7 @@ EOT
 
 defsrc = ERB.new(<<-EOT, trim_mode: '-')
   \# <%= name %>
-<%= word_wrap_lines(doc.reject(&:blank?)).collect { '  # ' + _1 }.join("\n") %>
+<%= word_wrap_lines(doc).collect { '  # ' + _1 }.join("\n") %>
 
 <% unless enums.empty? -%>
 <% enums.collect do |n, v| -%>
@@ -161,19 +165,21 @@ defsrc = ERB.new(<<-EOT, trim_mode: '-')
 EOT
 
 src = ERB.new(<<-EOT, trim_mode: '-')
-\# DO NOT EDIT.
-\# Auto-generated using `<%= cmd.join(' ') %>`
-\#       Time: <%= Time.now %>
-\# Input hash: <%= hash.class.name.split('::')[-1] %>:<%= hash %>
-\#
-<%= word_wrap_lines(preamble.reject(&:blank?)).collect { '# ' + _1 }.join("\n") %>
-
-module NonoP; module Protocol; end; end
-
-module NonoP::Protocol::Messages
+module NonoP
+  module Protocol
+    \# DO NOT EDIT. Auto-generated.
+    \#
+    \# |    Command | `<%= cmd.join(' ') %>` |
+    \# |       Time | <%= Time.now %> |
+    \# | Input hash | <%= hash.class.name.split('::')[-1] %>:<%= hash %> |
+    \#
+<%= word_wrap_lines(preamble).collect { '    # ' + _1 }.join("\n") %>
+    module Messages
 <% defs.collect do |d| -%>
 <%= defsrc.result_with_hash(d.to_hash) %>
 <% end -%>
+    end
+  end
 end
 EOT
 
