@@ -7,6 +7,7 @@
 #
 
 require 'erb'
+require 'digest/sha2'
 require 'sg/ext'
 using SG::Ext
 
@@ -64,11 +65,14 @@ class Definition
   end
 end
 
+input_hash = Digest::SHA256.new
 preamble = []
 defs = []
 definition = nil
 
 ARGF.each_line do |line|
+  input_hash << line
+
   if !definition && line !~ /\A\#+ \w+ -+/
     preamble << line.rstrip
     next
@@ -91,6 +95,9 @@ ARGF.each_line do |line|
   else definition.doc << line.rstrip if definition
   end
 end
+
+# finish off the input
+ARGF.each_line { input_hash << _1 }
 
 def packing_for_fields fields
   fields.collect do |f|
@@ -154,7 +161,10 @@ defsrc = ERB.new(<<-EOT, trim_mode: '-')
 EOT
 
 src = ERB.new(<<-EOT, trim_mode: '-')
+\# DO NOT EDIT.
 \# Auto-generated using `<%= cmd.join(' ') %>`
+\#       Time: <%= Time.now %>
+\# Input hash: <%= hash.class.name.split('::')[-1] %>:<%= hash %>
 \#
 <%= word_wrap_lines(preamble.reject(&:blank?)).collect { '# ' + _1 }.join("\n") %>
 
@@ -167,4 +177,4 @@ module NonoP::Protocol::Messages
 end
 EOT
 
-puts src.result_with_hash(preamble:, defs:, cmd: [ $0, *FULL_ARGV ])
+puts src.result_with_hash(hash: input_hash, preamble:, defs:, cmd: [ $0, *FULL_ARGV ])
