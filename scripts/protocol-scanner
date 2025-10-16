@@ -43,7 +43,7 @@ class Request
       else $stderr.puts("WARNING Unknown field format: #{f}")
       end
     end
-    fields.delete(:tag)
+    fields.delete_if { _1[0] == :tag }
     self.new(name, fields)
   end
 end
