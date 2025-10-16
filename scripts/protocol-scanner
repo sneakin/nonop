@@ -147,20 +147,26 @@ EOT
 
 defsrc = ERB.new(<<-EOT, trim_mode: '-')
   \# <%= name %>
+  \#
 <%= word_wrap_lines(doc).collect { '  # ' + _1 }.join("\n") %>
+<% if request -%>
+<% if reply -%>  \# Replied with {<%= reply&.name || name %>}
+<% end -%>
+  \#
+<%= req.result_with_hash(request.to_hash.merge(request: request)) -%>
 
+<% end -%>
+<% if reply -%>
+<% if request -%>  \# Reply to {<%= request&.name || name %>}
+<% end -%>
+  \#
+<%= req.result_with_hash(reply.to_hash.merge(request: request)) -%>
+
+<% end -%>
 <% unless enums.empty? -%>
 <% enums.collect do |n, v| -%>
 <%= enum.result_with_hash(name: n, values: v) -%>
-
 <% end -%>
-<% end -%>
-<% if request -%>
-<%= req.result_with_hash(request.to_hash.merge(request: request)) -%>
-<% end -%>
-<% if reply -%>
-
-<%= req.result_with_hash(reply.to_hash.merge(request: request)) -%>
 <% end -%>
 EOT
 
