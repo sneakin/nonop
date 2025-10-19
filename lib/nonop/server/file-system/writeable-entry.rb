@@ -23,9 +23,10 @@ module NonoP::Server::FileSystem
     # @return [Integer, void]
     # @raise SystemCallError
     def write data, offset = 0, &blk
-      n = super
-      @cb&.call(self, data, offset)
-      NonoP.maybe_call(blk, n)
+      super(data, offset) do |n|
+        @cb&.call(self, data, offset)
+        NonoP.maybe_call(blk, n)
+      end
     end
   end
 end
