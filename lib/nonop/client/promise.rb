@@ -6,8 +6,12 @@ require_relative 'pending-value'
 
 class NonoP::Client
   class Promise < SG::Promise
+    attr_reader :value
+    
     def initialize client, fn = nil, &blk
-      super(fn, value: PendingValue.new(client), &blk)
+      @value = PendingValue.new(client)
+      @client = client
+      super(fn, &blk)
     end
 
     delegate :ready?, to: :value
@@ -15,9 +19,9 @@ class NonoP::Client
     def called?; @called; end
   
     def call(...)
-      return value.wait if @called
+      return value.wait if called?
       @called = true
-      super
+      resolve(value, ...)
     end
     
     def wait

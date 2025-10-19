@@ -188,8 +188,8 @@ module NonoP
       # accessing process.
       @auth_prom = Promise.new(self).
         and_then { @in_auth = true }.
-        and_then { send_auth(uname:, aname:, n_uname:).wait }.
-        and_then { write_creds(credentials, _1) }.
+        and_then { send_auth(uname:, aname:, n_uname:) }.
+        and_then { write_creds(credentials, _1.wait) }.
         and_then { |io| [ auth_attach(uname:, aname:, n_uname:, afid: io.fid).wait, io ] }.
         and_then { [ update_state(uname:, aname:, n_uname:, afid: _1[1]), _1 ] }.
         and_then { |authed, fids| fids.each(&:close); authed }
@@ -209,7 +209,6 @@ module NonoP
     end
 
     def attach(**opts, &blk)
-      # todo #wait
       Attachment.new(**opts.merge(client: self), &blk)
     end
 
@@ -247,6 +246,7 @@ module NonoP
       req = io.write(credentials) do |total, errs|
         NonoP.vputs { "SENT AUTH: #{total} #{errs&.size}" }
         raise errs[0] unless errs == nil || errs.empty?
+        io
       end.wait
       io
     end
