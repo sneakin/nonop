@@ -62,7 +62,7 @@ describe 'nonop server' do
               client.auth(uname: user,
                           aname: 'ctl',
                           n_uname: uid || 0xBAD,
-                          credentials: auth_creds)
+                          credentials: auth_creds).wait
             end
           end
           describe 'for spec' do
@@ -70,7 +70,7 @@ describe 'nonop server' do
               client.auth(uname: user,
                           aname: 'spec',
                           n_uname: uid || 0xBAD,
-                          credentials: auth_creds)
+                          credentials: auth_creds).wait
             end
           end
         end
@@ -98,16 +98,14 @@ describe 'nonop server' do
               raises_when(!can_attach_spec, NonoP::AttachError) do
                 client.attach(uname: user,
                               n_uname: uid || 0,
-                              aname: 'spec',
-                              wait_for: true)
+                              aname: 'spec').wait
               end
             end
             describe 'on ctl' do
               raises_when(!can_attach_ctl, NonoP::AttachError) do
                 client.attach(uname: user,
                               n_uname: uid || 0,
-                              aname: 'ctl',
-                              wait_for: true)
+                              aname: 'ctl').wait
               end
             end
           end
@@ -133,16 +131,14 @@ describe 'nonop server' do
               raises_when(!can_attach_spec, NonoP::AttachError) do
                 client.attach(uname: user,
                               n_uname: uid || 0,
-                              aname: 'spec',
-                              wait_for: true)
+                              aname: 'spec').wait
               end
             end
             describe 'on ctl' do
               raises_when(!can_attach_ctl, NonoP::AttachError) do
                 client.attach(uname: user,
                               n_uname: uid || 0,
-                              aname: 'ctl',
-                              wait_for: true)
+                              aname: 'ctl').wait
               end
             end
           end

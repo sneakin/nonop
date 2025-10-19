@@ -42,8 +42,8 @@ module NonoP
     end
 
     # todo an async version to complement an enumerable; needs to pass a continuation to ~blk~
-    def entries count: nil, offset: nil, wait_for: true, &blk
-      return to_enum(__method__, count:, offset:, wait_for: true) unless blk
+    def entries count: nil, offset: nil, &blk
+      return to_enum(__method__, count:, offset:) unless blk
 
       count ||= READ_SIZE
 
@@ -55,7 +55,7 @@ module NonoP
             dir.entries.each(&blk)
             cc.call(dir.entries.size < count, offset + dir.entries.size)
           end
-        end.skip_unless(wait_for).wait
+        end.wait
       end
     end
 

@@ -6,6 +6,8 @@
 # {NonoP::Protocol::Messages} module.
 #
 
+# fixme auth & attach
+
 require 'erb'
 require 'digest/sha2'
 require 'sg/ext'

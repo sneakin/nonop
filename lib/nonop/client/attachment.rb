@@ -9,30 +9,35 @@ module NonoP
     attr_reader :qid, :client
     attr_reader :fid, :afid, :uname, :n_uname, :aname
 
-    def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, wait_for: false, &blk
+    def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, &blk
       @client = client
       @fid = fid || client.next_fid
       @afid = afid || -1
       @uname = uname || ''
       @n_uname = n_uname || -1
       @aname = aname
-      client.request(NonoP::L2000::
+      @attach_req = client.request(NonoP::L2000::
                      Tattach.new(fid: @fid,
                                  afid: @afid,
                                  uname: NonoP::NString.new(uname),
                                  aname: NonoP::NString.new(aname),
                                  n_uname: n_uname)) do |pkt|
         case pkt
-        when ErrorPayload then raise (@afid != -1 ? AuthError : AttachError).new(pkt)
+        when ErrorPayload then raise (@afid == 0xFFFFFFFF ? AuthError : AttachError).new(pkt)
         when Rattach then
           client.track_fid(@fid)
           @qid = pkt.aqid
           @ready = true
           blk&.call(self)
         end
-      end.skip_unless(wait_for).wait
+      end
     end
 
+    def wait
+      @attach_req.wait
+      self
+    end
+    
     def ready?
       @ready
     end

@@ -97,7 +97,7 @@ class LsCommand < NonoP::Command::Client
   end
 
   def read_dirents dir
-    dir.entries(wait_for: true).collect do |ent|
+    dir.entries.collect do |ent|
       if (sort_field && sort_field != :name) || !short_list
         stats = if client.remote_version == NonoP::L2000::Decoder::VERSION
                   dir.getattr(ent.name.to_s)

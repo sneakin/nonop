@@ -12,6 +12,10 @@ module NonoP
     calc_attr :size, lambda { value.bytesize }
 
     delegate :blank?, :empty?, :each_char, :each_byte, to: :value
+
+    def self.[](...)
+      self.new(...)
+    end
     
     def initialize *opts
       super()

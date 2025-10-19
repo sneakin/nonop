@@ -1,41 +1,33 @@
 require 'sg/ext'
 using SG::Ext
 
-class NonoP::Client
-  class PendingRequest
-    def initialize client, pkt, handler
-      @client = client
-      @pkt = pkt
-      @handler = handler
-    end
+require 'sg/defer'
 
-    def tag
-      @pkt.tag
-    end
+class NonoP::Client
+  class PendingRequest < SG::Defer::Value
+    attr_reader :client, :packet
     
-    def call response
-      @result = @handler ? @handler.call(response) : response
-    end
-    
-    def wait
-      if @result
-        @result
-      else
-        _, result = @client.process_until(tag: @pkt.tag)
+    def initialize client, packet, handler
+      @packet = packet
+      @handler = handler
+      super() do
+        _, result = client.process_until(tag: tag)
         result
       end
     end
 
-    def ready?
-      @result != nil
+    delegate :tag, to: :packet
+    
+    def accept v
+      super(@handler.call(v))
     end
-
-    def result
-      @result
+    
+    def reject v
+      super(@handler.call(v))
     end
   end
-
-  class PendingRequests
+  
+  class PendingRequests < SG::Defer::Value
     attr_reader :client, :pending, :results
     
     def initialize(client)
@@ -43,6 +35,7 @@ class NonoP::Client
       @pending = Array.new
       @results = []
       @after = []
+      super() { produce }
     end
 
     delegate :size, :empty?, :blank?, to: :pending
@@ -64,16 +57,15 @@ class NonoP::Client
       @pending.collect(&:tag)
     end
 
-    def wait_one
+    def produce_one
       @client.process_until(tags: pending_tags).tap do |tag, r|
-        NonoP.vputs { "Waited for #{tag}" }
         @results << r
         @pending.delete_if { _1.tag == tag }
       end
     end
 
-    def wait
-      wait_one until @pending.empty?
+    def produce
+      produce_one until @pending.empty?
       @after.reduce(@results) { _2.call(_1) }
     end
 
