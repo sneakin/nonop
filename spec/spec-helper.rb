@@ -27,7 +27,7 @@ module NonoP::SpecHelper
                         '--export', 'basic:examples/basic-fs.rb',
                         *args)
     now = Time.at(Time.now.to_i + 1).strftime("%x %X")
-    sleep(2) # fixme need a signal of sorts
+    sleep(2) # fixme need a ready signal of sorts
     [ pid, now ]
   end
 

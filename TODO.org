@@ -16,13 +16,13 @@
 **** NonoP::FileSystem subclassing
 ** Development enviroment
 *** Rakefile
-**** Rpec
-**** YARD
+**** DONE Rpec
+**** DONE YARD
 ** Tests
 *** Mkdir
 *** cat & put: Bigger files
 ** Operation support
-*** Surveying what ops are needed
+*** DONE Surveying what ops are needed
 *** Writing
 *** Deleting
 **** Files
@@ -37,7 +37,8 @@
 **** mknod
 **** Pass throughbof major, minor
 **** Direct IO
-*** Generated table of support and testing state
+*** DOING Test suite of every request against each file system provider.
+**** Generated table of support and testing state
 ** EasyFS integration: FUSE and 9p file systems.
 ** Benchmarks & standard file system tests
 ** File system quirk hiding
@@ -45,19 +46,27 @@
 
 ** Proxy to another server
 ** Drop in embedded server
+** Read & write requests larger than the allowed message size
+*** Client side: Their handlers should remain until all the data has been accounted.
+*** Server: handle requests w/ large counts
 
 * Bugs
-** TODO stray: ~Error on #<NonoP::Server::Connection [::ffff:127.0.0.1]:50988> TypeError: no implicit conversion of NonoP::Server::Connection into Integer~
+** DONE stray: ~Error on #<NonoP::Server::Connection [::ffff:127.0.0.1]:50988> TypeError: no implicit conversion of NonoP::Server::Connection into Integer~
 :LOGBOOK:
+- State "DONE"       from "DOING"      [2025-10-19 Sun 13:35]
 - State "TODO"       from              [2025-10-10 Fri 04:42]
 :END:
 ** `..` walks up the dir tree...or is that Linux?
 ** Deadlock when exporting itself in the file system.
 ** Fifos
-
+*** Open can block
+*** No offsets for read and write
+*** In process virtual pipes
+**** Posix
+**** 1-to-M
 ** In the source
 #+NAME todos
-#+BEGIN_SRC shell :results output org
+#+BEGIN_SRC sh :results output org
 grep --exclude \*~ -Hn -iE "todo|fixme" -r ./{bin,lib,spec} | sed -E -e 's/(.+):([0-9]+):(.*)\( +([@]?todo.*|fixme.*) +(.*) +\)/\4 \5 [[file:\1::\2]]/g' -e 's:[@]?todo:TODO:g' -e 's:[@]?fixme:FIXME:g' | tee >(wc -l)
 #+END_SRC
 
@@ -74,36 +83,40 @@ grep --exclude \*~ -Hn -iE "todo|fixme" -r ./{bin,lib,spec} | sed -E -e 's/(.+):
 ./lib/nonop/client/remote-io.rb:22:    # TODO length limited to msglen
 ./lib/nonop/client/remote-io.rb:23:    # TODO handling multiple replies for big reads
 ./lib/nonop/server/auth.rb:87:  # TODO get users from system
-./lib/nonop/server/file-system/buffer-entry.rb:78:      NonoP.maybe_call(cb, data.size) # TODO bytesize?
-./lib/nonop/server/file-system/buffer-entry.rb:91:      @attrs = attrs.merge(new_attrs) # TODO be picky
+./lib/nonop/server/file-system/buffer-entry.rb:79:      NonoP.maybe_call(cb, data.size) # TODO bytesize?
+./lib/nonop/server/file-system/buffer-entry.rb:92:      @attrs = attrs.merge(new_attrs) # TODO be picky
 ./lib/nonop/server/file-system/directory-entry.rb:100:      entries.values[offset, count] || [] # TODO cache in the DataProvider?
 ./lib/nonop/server/file-system/fifo-entry.rb:105:      @attrs = attrs.merge(new_attrs) # TODO be picky
 ./lib/nonop/server/file-system/path-entry.rb:39:        # TODO full mapping
 ./lib/nonop/server/file-system/path-entry.rb:64:        # FIXME
 ./lib/nonop/server/file-system/path-entry.rb:86:        # FIXME deadlock on pipes, the open may be the blocker
 ./lib/nonop/server/file-system/path-entry.rb:87:        # FIXME unable to seek fifos
-./lib/nonop/server/file-system/path-entry.rb:144:    # TODO What happens if the io blocks? Ideally a reply finally gets sent when data is read w/o blocking any thing else.
-./lib/nonop/server/file-system/path-entry.rb:145:    # TODO Purely IO backed entries: open & close pose problems
+./lib/nonop/server/file-system/path-entry.rb:136:    # TODO What happens if the io blocks? Ideally a reply finally gets sent when data is read w/o blocking any thing else.
+./lib/nonop/server/file-system/path-entry.rb:137:    # TODO Purely IO backed entries: open & close pose problems
 ./lib/nonop/server/file-system/base.rb:121:    # TODO File stat structure insteadbof open hashes
 ./lib/nonop/server/connection.rb:137:      # TODO the afid should tie the user to the export via fid
 ./lib/nonop/server/connection.rb:158:        # TODO get export via the stream?
 ./lib/nonop/server/connection.rb:182:      # TODO refuse anon access?
 ./lib/nonop/server/connection.rb:185:      # TODO manual also says afid ~0 means no auth
 ./lib/nonop/server/connection.rb:214:    # TODO async reply
-./lib/nonop/server/connection.rb:227:    # TODO async reply
-./lib/nonop/server/connection.rb:233:                  end.but!(SystemCallError) do |err| # FIXME not catching
-./lib/nonop/client.rb:111:    # TODO ditch wait_for form a PendingRequest#wait
-./lib/nonop/client.rb:211:      free_fid(fid) # TODO call this? default calls back.
-./lib/nonop/client.rb:223:      # TODO #wait
+./lib/nonop/server/connection.rb:228:    # TODO async reply
+./lib/nonop/server/connection.rb:234:                  end.but!(SystemCallError) do |err| # FIXME not catching
+./lib/nonop/client.rb:71:      # TODO reject errors
+./lib/nonop/client.rb:72:      ret = fn.accept(pkt.data) # TODO toying w/ what waiters need
+./lib/nonop/client.rb:201:      free_fid(fid) # TODO call this? default calls back.
 ./lib/nonop/decoder.rb:115:      # TODO any real need for Packet? Which of these is faster?
 ./lib/nonop/decoder.rb:128:      # raise InvalidSize.new(len, max_msglen) if len === 0..max_msglen # TODO off by 1?
 ./lib/nonop/qid.rb:11:    # TODO bitfield
 ./lib/nonop/command.rb:100:          @auth_creds ||= Munge.encode(uid: uid) # TODO auth provider
-./lib/nonop.rb:1:# TODO have each type only handle @data?
-./lib/nonop.rb:2:# TODO much much; only decodes a failed mount
+./lib/nonop/protocol/messages.rb:362:  #  flags is used to pass Linux kernel intent bits (FIXME: diod ignores
+./lib/nonop/thread-pool.rb:276:  # TODO start tasks in parallel w/ dead lock
 ./spec/commands/server.spec:9:# TODO shared secret auth instead of munge
 ./spec/commands/server.spec:51:      # FIXME stop using the Yes backend to test bad users; only
 ./spec/commands/server.spec:95:            # TODO uid=~0
 ./spec/spec-helper.rb:30:    sleep(2) # FIXME need a signal of sorts
-42
+./spec/integration/requests/version.rb:17:      expect(reply.msize).to eql(0xFFFF) # TODO match client? or server?
+./spec/integration/requests/clunk.rb:30:      # TODO tbd
+./spec/integration/requests/lauth.rb:29:      # TODO Attachment#initialize needs to wait
+./spec/integration/requests/lauth.rb:78:        # TODO multiple small writes...a reason why to delay for action on attach
+46
 #+end_src

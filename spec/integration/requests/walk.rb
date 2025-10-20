@@ -63,7 +63,7 @@ shared_examples_for 'server allowing Twalk' do
                                                wnames: [])).wait).
           to be_kind_of(NonoP::ErrorPayload)
       end
-      it 'errors using 0 for the afid' do
+      it 'errors using 0 for the fid' do
         expect(client.request(NonoP::Twalk.new(fid: 0,
                                                newfid: 1,
                                                nwnames: 0,
