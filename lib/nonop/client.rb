@@ -69,8 +69,9 @@ module NonoP
       pkt = read_one
       fn = @handlers.delete(pkt.tag) || method(:on_packet)
       # todo reject errors
-      ret = fn.accept(pkt.data)
-      @waiting_results[pkt.tag] = ret if @waiting_tags.delete(pkt.tag)
+      ret = fn.accept(pkt.data) # todo toying w/ what waiters need
+      # @waiting_results[pkt.tag] = ret if @waiting_tags.delete(pkt.tag)
+      @waiting_results[pkt.tag] = pkt if @waiting_tags.delete(pkt.tag)
       pkt
     end
 

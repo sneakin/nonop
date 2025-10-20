@@ -39,11 +39,12 @@ module NonoP
       # and reduced to a total byte count and any errors.
       requests = NonoP::Client::PendingRequests.new(client).
         after do |results|
-        results.reduce([0, []]) do |(total, errs), cnt|
-          if StandardError === cnt
-            [ total, errs << cnt ]
+        results.reduce([0, []]) do |(total, errs), pkt|
+          NonoP.vputs { [ "CNT", pkt.inspect ] }
+          if ErrorPayload === pkt.data
+            [ total, errs << pkt.data ]
           else
-            [ total + cnt, errs ]
+            [ total + pkt.data.count, errs ]
           end
         end.tap { blk&.call(*_1) }
       end
