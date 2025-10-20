@@ -1,4 +1,5 @@
 * Features
+** Review Tautch and Tattach w/ afid = -1 and not; and caching of auth results
 ** Namespacing
 *** FlagFields out of Topen
 *** Messages under NonoP::Messages

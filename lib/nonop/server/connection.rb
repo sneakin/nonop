@@ -132,6 +132,7 @@ module NonoP::Server
       end
     end
 
+    # fixme using afid != -1 errors; stream.authenticated? fails w/ creds cleared; Tattchbalvays needs a Tauth to create an afid?
     # @return [void]
     def on_attach pkt
       # todo the afid should tie the user to the export via fid
@@ -150,7 +151,7 @@ module NonoP::Server
       user = pkt.data.uname.to_s unless pkt.data.uname.blank?
       uid = pkt.data.n_uname
       
-      if stream.authentic?(user, uid, aname: aname) &&
+      if stream.authenticate(user, uid, aname: aname) &&
           acl.attach?(aname,
                       user: stream.user,
                       remote_address: remote_address)

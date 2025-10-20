@@ -35,6 +35,10 @@ module NonoP::Server
       NonoP.maybe_call(cb, data.size)
     end
 
+    def authenticate(...)
+      @user || authentic?(...)
+    end
+    
     def authentic? uname = nil, uid = nil, credentials: nil, aname: nil
       NonoP.vputs {
         addr = begin

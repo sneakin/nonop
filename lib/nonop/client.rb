@@ -190,9 +190,9 @@ module NonoP
         and_then { @in_auth = true }.
         and_then { send_auth(uname:, aname:, n_uname:) }.
         and_then { write_creds(credentials, _1.wait) }.
-        and_then { |io| [ auth_attach(uname:, aname:, n_uname:, afid: io.fid).wait, io ] }.
-        and_then { [ update_state(uname:, aname:, n_uname:, afid: _1[1]), _1 ] }.
-        and_then { |authed, fids| fids.each(&:close); authed }
+        and_then { |io| auth_attach(uname:, aname:, n_uname:, afid: io.fid).
+                   wait.tap { |a| track_fid(a.fid) { a.close }; io.close } }.
+        and_then { update_state(uname:, aname:, n_uname:, attachment: _1) }
     end
     
     def clunk fid, &blk
@@ -213,13 +213,14 @@ module NonoP
     end
 
     def auth_attach(**opts, &blk)
+      # todo get from @authenticated
       Attachment.new(**opts.merge(client: self), &blk)
     end
 
     def flush_tag oldtag, &blk
       request(Tflush.new(oldtag: oldtag), &blk)
     end
-
+    
     private
 
     def send_auth(uname:, n_uname:, aname:)
@@ -251,9 +252,9 @@ module NonoP
       io
     end
 
-    def update_state uname:, n_uname:, aname:, afid:
-      NonoP.vputs { 'Updating state' }
-      @authenticated[aname] = { uname:, n_uname:, aname:, afid: }
+    def update_state uname:, n_uname:, aname:, attachment:
+        NonoP.vputs { "Updating state #{uname} #{aname}" }
+      @authenticated[aname] = { uname:, n_uname:, aname:, attachment: }
       :yes
     end
   end
