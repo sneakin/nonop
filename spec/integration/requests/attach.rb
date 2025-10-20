@@ -135,6 +135,17 @@ shared_examples_for 'server allowing Tattach' do
           expect(reply).to be_kind_of(NonoP::Rattach)
         end.wait
       end
+
+      it "attaches w/ the client's helper" do
+        att = client.attach(fid: 0,
+                            afid: -1,
+                            uname: state.username,
+                            aname: state.aname,
+                            n_uname: state.uid)
+        att.wait
+        expect(att).to be_ready
+        expect { att.close }.to_not raise_error
+      end
     end
   end
 end
