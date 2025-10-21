@@ -4,10 +4,10 @@ using SG::Ext
 require_relative '../helper'
 
 shared_examples_for 'server allowing Twalk' do
-  |state: ClientHelper.default_state, path: 'info/now', badpath: 'info/err'|
+  |state: ClientHelper.default_state,
+   path: 'info/now',
+   badpath: 'info/later'|
 
-  # todo use paths
-  
   include ClientHelper
   
   before do
@@ -106,15 +106,13 @@ shared_examples_for 'server allowing Twalk' do
         let(:newfid) { rand(1000) }
         
         it 'made a new fid' do
+          parts = path.split('/')
           client.request(NonoP::Twalk.new(fid: attachment_fid,
                                           newfid: newfid,
-                                          nwnames: 2,
-                                          wnames: [ NonoP::NString['info'],
-                                                    NonoP::NString['now']
-                                                  ])) do |pkt|
+                                          wnames: parts.collect { NonoP::NString[_1] })) do |pkt|
             expect(pkt).to be_kind_of(NonoP::Rwalk)
-            expect(pkt.nwqid).to eql(2)
-            expect(pkt.wqid.size).to eql(2)
+            expect(pkt.nwqid).to eql(parts.size)
+            expect(pkt.wqid.size).to eql(parts.size)
           end.wait
           expect(client.request(NonoP::Tclunk.new(fid: newfid)).wait).
             to be_kind_of(NonoP::Rclunk)
@@ -126,8 +124,7 @@ shared_examples_for 'server allowing Twalk' do
           before do
             expect(client.request(NonoP::Twalk.new(fid: attachment_fid,
                                             newfid: newfid,
-                                            nwnames: 1,
-                                            wnames: [ NonoP::NString['info']
+                                            wnames: [ NonoP::NString[path.split('/').first]
                                                     ])).wait).
               to be_kind_of(NonoP::Rwalk)
           end
@@ -148,13 +145,13 @@ shared_examples_for 'server allowing Twalk' do
           end
           
           it 'walks deeper' do
+            parts = path.split('/')
             client.request(NonoP::Twalk.new(fid: newfid,
                                             newfid: clonedfid,
-                                            nwnames: 1,
-                                            wnames: [ NonoP::NString['now'] ])) do |pkt|
+                                            wnames: parts[1..-1].collect { NonoP::NString[_1] })) do |pkt|
               expect(pkt).to be_kind_of(NonoP::Rwalk)
-              expect(pkt.nwqid).to eql(1)
-              expect(pkt.wqid.size).to eql(1)
+              expect(pkt.nwqid).to eql(parts.size - 1)
+              expect(pkt.wqid.size).to eql(parts.size - 1)
             end.wait
             expect(client.request(NonoP::Tclunk.new(fid: clonedfid)).wait).
               to be_kind_of(NonoP::Rclunk)
@@ -168,15 +165,13 @@ shared_examples_for 'server allowing Twalk' do
         let(:newfid) { rand(10000) }
         
         it 'walks to the parent that exists' do
+          parts = badpath.split('/')
           client.request(NonoP::Twalk.new(fid: attachment_fid,
                                           newfid: newfid,
-                                          nwnames: 2,
-                                          wnames: [ NonoP::NString['info'],
-                                                    NonoP::NString['later']
-                                                  ])) do |pkt|
+                                          wnames: parts.collect { NonoP::NString[_1] })) do |pkt|
             expect(pkt).to be_kind_of(NonoP::Rwalk)
-            expect(pkt.nwqid).to eql(1)
-            expect(pkt.wqid.size).to eql(1)
+            expect(pkt.nwqid).to eql(parts.size - 1)
+            expect(pkt.wqid.size).to eql(parts.size - 1)
           end.wait
           expect(client.request(NonoP::Tclunk.new(fid: newfid)).wait).
             to be_kind_of(NonoP::Rclunk)

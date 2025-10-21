@@ -1,7 +1,7 @@
 require 'sg/ext'
 using SG::Ext
 
-require_relative 'helper'
+require_relative '../helper'
 
 shared_examples_for 'server allowing Tversion' do
   |version: '9P2000.L', state:|

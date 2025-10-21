@@ -1,7 +1,7 @@
 require 'sg/ext'
 using SG::Ext
 
-require_relative 'helper'
+require_relative '../helper'
 
 # todo uses L2000::Tattach
 
@@ -162,6 +162,13 @@ shared_examples_for 'server refusing Tattach' do
   it_should_behave_like 'server auths with Tattach', state: state
 
   describe 'after auth' do
+    before do
+      client.auth(uname: state.username,
+                  aname: state.aname,
+                  n_uname: state.uid,
+                  credentials: state.creds)
+    end
+
     describe 'disallowed user' do
       it 'errors' do
         client.request(NonoP::L2000::Tattach.

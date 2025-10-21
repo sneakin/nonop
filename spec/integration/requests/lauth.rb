@@ -1,7 +1,7 @@
 require 'sg/ext'
 using SG::Ext
 
-require_relative 'helper'
+require_relative '../helper'
 
 # fixme Server needs to delay user lookup errors until attach
 

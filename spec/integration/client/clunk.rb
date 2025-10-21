@@ -4,7 +4,7 @@ using SG::Ext
 require_relative '../helper'
 
 shared_examples_for 'server allowing Tclunk' do
-  |state: ClientHelper.default_state|
+  |state: ClientHelper.default_state, path: 'info/now'|
 
   include ClientHelper
   
@@ -14,8 +14,8 @@ shared_examples_for 'server allowing Tclunk' do
 
   describe 'before auth' do
     it 'errors' do
-      expect(client.request(NonoP::Tclunk.new(fid: 0)).wait).
-        to be_kind_of(NonoP::ErrorPayload) # todo Rerror until Tversion
+      expect(client.clunk(0).wait).
+        to be_kind_of(NonoP::ClunkError) # todo Rerror until Tversion
     end
   end
 
@@ -31,19 +31,19 @@ shared_examples_for 'server allowing Tclunk' do
     
     describe 'the afid' do
       it 'destroys the fid' do
-        expect(client.request(NonoP::Tclunk.new(fid: state.afid)).wait).
+        expect(client.clunk(state.afid).wait).
           to be_kind_of(NonoP::Rclunk)
       end
       
       it 'disconnects' do
-        expect { client.request(NonoP::Tclunk.new(fid: state.afid)).wait }.
+        expect { client.clunk(state.afid).wait }.
           to change(client, :closed?).to eql(true)
       end
     end
     describe 'any other' do
       it 'errors' do
-        expect(client.request(NonoP::Tclunk.new(fid: 789)).wait).
-          to be_kind_of(NonoP::ErrorPayload)
+        expect(client.clunk(789).wait).
+          to be_kind_of(NonoP::ClunkError)
       end
     end      
   end
@@ -71,18 +71,18 @@ shared_examples_for 'server allowing Tclunk' do
       end
 
       it 'can clunk the attachment' do
-        expect(client.request(NonoP::Tclunk.new(fid: attachment_fid)).wait).
+        expect(client.clunk(attachment_fid).wait).
           to be_kind_of(NonoP::Rclunk)
       end
 
       it 'can not clunk the afid' do
-        expect(client.request(NonoP::Tclunk.new(fid: state.afid)).wait).
-          to be_kind_of(NonoP::ErrorPayload)
+        expect(client.clunk(state.afid).wait).
+          to be_kind_of(NonoP::ClunkError)
       end
 
       it 'errors on other fids' do
-        expect(client.request(NonoP::Tclunk.new(fid: 789)).wait).
-          to be_kind_of(NonoP::ErrorPayload)
+        expect(client.clunk(789).wait).
+          to be_kind_of(NonoP::ClunkError)
       end
 
       describe 'after a walk nowhere' do
@@ -96,12 +96,8 @@ shared_examples_for 'server allowing Tclunk' do
         end
         
         it 'can clunk the new fid' do
-          expect(client.request(NonoP::Tclunk.new(fid: 2)).wait).
+          expect(client.clunk(2).wait).
             to be_kind_of(NonoP::Rclunk)
-        end
-
-        it "clunks w/ the client's helper" do
-          expect(client.clunk(2).wait).to be_kind_of(NonoP::Rclunk)
         end
       end
 
@@ -110,20 +106,13 @@ shared_examples_for 'server allowing Tclunk' do
           expect(client.request(NonoP::Twalk.
                                 new(fid: attachment_fid,
                                     newfid: 2,
-                                    nwnames: 0,
-                                    wnames: [ NonoP::NString['info'],
-                                              NonoP::NString['now']
-                                            ])).wait).
+                                    wnames: patt.split('/').collect { NonoP::NString[_1] })).wait).
             to be_kind_of(NonoP::Rwalk)
         end
         
         it 'can clunk the new fid' do
-          expect(client.request(NonoP::Tclunk.new(fid: 2)).wait).
+          expect(client.clunk(2).wait).
             to be_kind_of(NonoP::Rclunk)
-        end
-
-        it "clunks w/ the client's helper" do
-          expect(client.clunk(2).wait).to be_kind_of(NonoP::Rclunk)
         end
       end
     end

@@ -1,7 +1,9 @@
 require 'sg/ext'
 using SG::Ext
 
-require_relative 'helper'
+require_relative '../helper'
+
+# todo server does not yet handle Tauth
 
 shared_examples_for 'server allowing Tauth' do
   |state:|
@@ -10,8 +12,8 @@ shared_examples_for 'server allowing Tauth' do
   
   let(:msg) do
     NonoP::Tauth.new(afid: 0,
-                     uname: NonoP::NString.new('9P2000.L'),
-                     aname: NonoP::NString.new('spec'))
+                     uname: NonoP::NString.new(state.username),
+                     aname: NonoP::NString.new(state.aname))
   end
 
   describe 'before Tversion' do
@@ -44,7 +46,7 @@ shared_examples_for 'server allowing Tauth' do
       describe 'writing valid creds' do
         it 'authenticates'
       end
-      describe 'writing isvalid creds' do
+      describe 'writing invalid creds' do
         it 'errors'
       end      
     end

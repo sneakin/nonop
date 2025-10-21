@@ -19,11 +19,18 @@ module ClientHelper
   end    
   
   def self.included base
+    base.extend(ClassMethods)
     base.let(:sock) { TCPSocket.new('localhost', NonoP::SpecHelper::PORT) }
     base.let(:client) { NonoP::Client.new(io: sock) }
 
     base.after do
       client.close
+    end
+  end
+
+  module ClassMethods
+    def path_hash path_body
+      Hash[[ :at, :contents ].zip(path_body)]
     end
   end
 end
