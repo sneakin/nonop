@@ -40,6 +40,11 @@ module NonoP::Server::FileSystem
       (open_flags & [ :WRONLY, :RDWR, :APPEND ])
     end
 
+    # @return [Boolean]
+    def open?
+      !!@backend
+    end
+    
     # @param flags [NonoP::BitField::Instance]
     # @return [self]
     def open flags
@@ -68,7 +73,19 @@ module NonoP::Server::FileSystem
       self
     end
 
-    delegate :truncate, :read, :write, :readdir, to: :backend
+    delegate :truncate, to: :backend
     delegate :qid, :size, :getattr, :setattr, to: :entry
+
+    def read(...)
+      backend ? backend.read(...) : raise(Errno::EACCES)
+    end
+    
+    def write(...)
+      backend ? backend.write(...) : raise(Errno::EACCES)
+    end
+    
+    def readdir(...)
+      backend ? backend.readdir(...) : raise(Errno::EACCES)
+    end
   end
 end

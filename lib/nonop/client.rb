@@ -62,7 +62,7 @@ module NonoP
 
     def pop_waiting_result tags
       ready_tag = tags.find { @waiting_results[_1] }
-      [ ready_tag, @waiting_results.delete(ready_tag) ] if ready_tag
+      [ ready_tag, @waiting_results.delete(ready_tag)&.data ] if ready_tag
     end
     
     def process_one
@@ -152,7 +152,7 @@ module NonoP
         when Rversion then
           @max_msglen = [ max_msglen, pkt.msize ].min
           @server_info = {
-            version: pkt.version,
+            version: pkt.version.value,
             msize: pkt.msize
           }
         end

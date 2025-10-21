@@ -89,7 +89,7 @@ module NonoP
       @version = version || VERSION
       @max_msglen = max_msglen || MAX_MSGLEN
       @packet_types = Hash.new(NopDecoder)
-      @packet_types_inv = Hash.new(NopDecoder)
+      @packet_types_inv = Hash.new
       add_packet_types(coders || RequestReplies)
     end
 
@@ -105,6 +105,7 @@ module NonoP
 
     def send_one pkt, io
       pkt.type = @packet_types_inv[pkt.coder]
+      raise TypeError.new("Unhandled packet type: #{pkt.coder}") unless pkt.type
       NonoP.vputs { "<< %s %i %s\n\t%s" % [ pkt.type, pkt.tag, pkt.size, pkt.inspect ] }
       data = pkt.pack
       NonoP.vputs { "   %s %i %s" % [ pkt.coder, data.size, data.inspect ] }

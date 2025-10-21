@@ -41,10 +41,10 @@ module NonoP
         after do |results|
         results.reduce([0, []]) do |(total, errs), pkt|
           NonoP.vputs { [ "CNT", pkt.inspect ] }
-          if ErrorPayload === pkt.data
-            [ total, errs << pkt.data ]
+          if ErrorPayload === pkt
+            [ total, errs << pkt ]
           else
-            [ total + pkt.data.count, errs ]
+            [ total + pkt.count, errs ]
           end
         end.tap { blk&.call(*_1) }
       end
