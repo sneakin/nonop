@@ -27,8 +27,12 @@ module NonoP
 
       client.request(NonoP::Tread.new(fid: fid,
                                       offset: offset,
-                                      count: length)) do |result|
-        NonoP.maybe_call(blk, wrap_error_or_data(result, ReadError))
+                                      count: length)) do |pkt|
+        if ErrorPayload === pkt
+          NonoP.maybe_call(blk, ReadError.new(pkt))
+        else
+          NonoP.maybe_call(blk, pkt.data)
+        end
       end.skip_unless(blk == nil).wait
     end
 
@@ -40,13 +44,12 @@ module NonoP
       requests = NonoP::Client::PendingRequests.new(client).
         after do |results|
         results.reduce([0, []]) do |(total, errs), pkt|
-          NonoP.vputs { [ "CNT", pkt.inspect ] }
           if ErrorPayload === pkt
             [ total, errs << pkt ]
           else
             [ total + pkt.count, errs ]
           end
-        end.tap { blk&.call(*_1) }
+        end.then { NonoP.maybe_call(blk, *_1) }
       end
 
       data ||= ''
@@ -72,21 +75,12 @@ module NonoP
       raise ArgumentError.new("Length %i must be 1...%i" % [ data.bytesize, client.max_datalen ]) unless (1..client.max_datalen) === data.bytesize
       raise ArgumentError.new("Offset must be positive") if offset < 0
 
-      NonoP.vputs { "write one #{data.size}" }
-      client.request(Twrite.new(fid: fid, offset: offset, data: data)) do |result|
-        NonoP.vputs { "write_one done #{result}" }
-        if blk
-          blk.call(NonoP.maybe_wrap_error(result, WriteError))
+      client.request(Twrite.new(fid: fid, offset: offset, data: data)) do |pkt|
+        if ErrorPayload === pkt
+          NonoP.maybe_call(blk, WriteError.new(pkt))
         else
-          ErrorPayload === result ? raise(result) : result.count
+          NonoP.maybe_call(blk, pkt.count)
         end
-      end
-    end
-
-    def wrap_error_or_data pkt, error = Error
-      case pkt
-      when ErrorPayload then error.new(pkt, path)
-      else pkt.data
       end
     end
   end

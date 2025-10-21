@@ -5,7 +5,10 @@ class NonoP::Client
     def initialize client
       super() do
         client.process_one until ready?
-        _1
+        @value
+      rescue
+        NonoP.vputs { "PV saw #{$!}" }
+        $!
       end
     end
   end

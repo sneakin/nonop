@@ -54,10 +54,15 @@ module NonoP
       @stop_loop = false
       begin
         pkt = process_one
-      end until tags.include?(pkt.tag) || tags.any? { !@waiting_tags[_1] } || @stop_loop || closed?
+      end until(tags.include?(pkt.tag) ||
+              tags.any? { !@waiting_tags[_1] } ||
+              @stop_loop ||
+              closed?)
+      
       tags.each { @waiting_tags.delete(_1) }
-
       pop_waiting_result(tags)
+    rescue IOError
+      nil
     end
 
     def pop_waiting_result tags
@@ -67,12 +72,20 @@ module NonoP
     
     def process_one
       pkt = read_one
+      NonoP.vputs { "Processing #{pkt.tag} #{@waiting_tags.keys.inspect}" }
       fn = @handlers.delete(pkt.tag) || method(:on_packet)
       # todo reject errors
-      ret = fn.accept(pkt.data) # todo toying w/ what waiters need
-      # @waiting_results[pkt.tag] = ret if @waiting_tags.delete(pkt.tag)
+      # @live_tags[pkt.tag] = pkt
       @waiting_results[pkt.tag] = pkt if @waiting_tags.delete(pkt.tag)
+      ret = fn.accept(pkt.data)
+      NonoP.vputs { "Processed #{pkt.tag} #{@waiting_tags.keys.inspect}" }
+      raise ret if Exception === ret
+      # raise Error.new(ret) if ErrorPayload === ret
       pkt
+    rescue
+      NonoP.vputs { [ "Threw #{$!.class}: #{$!}", *$!.backtrace ] }
+      fn&.reject($!)
+      raise
     end
 
     def read_one
@@ -168,6 +181,10 @@ module NonoP
       server_info[:version]
     end
 
+    def authenticated_for? aname
+      @authenticated.has_key?(aname)
+    end
+    
     def authenticated?
       !@authenticated.empty?
     end
@@ -202,9 +219,9 @@ module NonoP
       request(NonoP::Tclunk.new(fid: fid)) do |reply|
         NonoP.vputs { "Clunked #{fid}" }
         case reply
-        when ErrorPayload then NonoP.maybe_call(blk, NonoP.maybe_wrap_error(reply, ClunkError))
         when Rclunk then NonoP.maybe_call(blk, reply)
-        else raise TypeError.new(reply.class)
+        when ErrorPayload then NonoP.maybe_call(blk, NonoP.maybe_wrap_error(reply, ClunkError))
+        else raise TypeError.new(reply)
         end
       end
     end
@@ -221,6 +238,10 @@ module NonoP
     def flush_tag oldtag, &blk
       request(Tflush.new(oldtag: oldtag), &blk)
     end
+
+    def auth_attachment_for aname
+      @authenticated.fetch(aname).fetch(:attachment)
+    end
     
     private
 
@@ -234,7 +255,7 @@ module NonoP
         case pkt
         when Rauth then auth_fid
         when ErrorPayload then raise AuthError.new(pkt)
-        when StandardError then raise(pkt)
+        when Exception then raise(pkt)
         else raise TypeError.new("Expected Rauth, not #{pkt}")
         end
       end

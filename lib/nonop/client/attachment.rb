@@ -16,19 +16,22 @@ module NonoP
       @uname = uname || ''
       @n_uname = n_uname || -1
       @aname = aname
-      @attach_req = client.request(NonoP::L2000::
-                     Tattach.new(fid: @fid,
-                                 afid: @afid,
-                                 uname: NonoP::NString.new(uname),
-                                 aname: NonoP::NString.new(aname),
-                                 n_uname: n_uname)) do |pkt|
+      @attach_req = client.request(NonoP::L2000::Tattach.
+                                   new(fid: @fid,
+                                       afid: @afid,
+                                       uname: NonoP::NString.new(uname),
+                                       aname: NonoP::NString.new(aname),
+                                       n_uname: n_uname)) do |pkt|
         case pkt
-        when ErrorPayload then raise (@afid == 0xFFFFFFFF ? AuthError : AttachError).new(pkt)
+        when ErrorPayload then
+          err = (@afid == 0xFFFFFFFF ? AuthError : AttachError).new(pkt)
+          blk ? blk.call(err) : raise(err)
         when Rattach then
           client.track_fid(@fid)
           @qid = pkt.aqid
           @ready = true
           blk&.call(self)
+        else raise TypeError.new(pkt)
         end
       end
     end
@@ -60,7 +63,7 @@ module NonoP
     def getattr(path, fid: nil, &blk)
       nfid ||= client.next_fid
       walk(path, fid: fid, nfid: nfid) do |walk|
-        if StandardError === walk
+        if ErrorPayload === walk
           return NonoP.maybe_call(blk, walk)
         else
           client.request(NonoP::L2000::Tgetattr.new(fid: nfid)) do |pkt|
@@ -74,7 +77,7 @@ module NonoP
     def stat(path, fid: nil, &blk)
       nfid ||= client.next_fid
       walk(path, fid: fid, nfid: nfid) do |walk|
-        if StandardError === walk
+        if ErrorPayload === walk
           return NonoP.maybe_call(blk, walk)
         else
           client.request(NonoP::Tstat.new(fid: nfid)) do |pkt|
@@ -90,18 +93,15 @@ module NonoP
       path = RemotePath.new(path) unless RemotePath === path
       client.request(NonoP::Twalk.new(fid: fid || self.fid,
                                       newfid: nfid,
-                                      wnames: path.collect { NonoP::NString.new(_1) })) do |pkt|
+                                      wnames: path.collect(&NonoP::NString))) do |pkt|
         case pkt
         when Rwalk then
           client.track_fid(nfid)
           NonoP.maybe_call(blk, pkt)
-        when ErrorPayload then
-          next NonoP.maybe_call(blk, WalkError.new(pkt, path))
-        else
-          next NonoP.maybe_call(blk, TypeError.new(pkt.class))
+        when ErrorPayload then maybe_call(blk, WalkError.new(pkt, path))
+        else raise TypeError.new(pkt.class)
         end
       end
     end
   end
-
 end

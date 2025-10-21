@@ -53,9 +53,20 @@ class PutCommand < NonoP::Command::Client
         block_size = client.server_info[:msize] - NonoP::Decoder::MIN_MSGLEN
       end
 
-      put(reader, arguments[0]) do |total, offset|
+      put(reader, arguments[0]) do |total|
         client.close
-        puts("Wrote %i bytes." % [ total ])
+        case total
+        when Exception then
+          $stderr.puts("Caught #{total.class}: #{total}")
+          NonoP.vputs { total.backtrace }
+          exit(1)
+        when NonoP::ErrorPayload
+          $stderr.puts("Error #{total.class}: #{total}")
+          exit(1)
+        else
+          $stderr.puts("Wrote %i bytes." % [ total ])
+          exit(0)
+        end
       end
     end
   end
@@ -63,25 +74,37 @@ class PutCommand < NonoP::Command::Client
   def put reader, target
     NonoP.vputs { "Put to #{target}" }
     client.attach(uname: uname, aname: aname, n_uname: uid) do |attachment|
-      raise attachment if RuntimeError === attachment
+      if Exception === attachment || NonoP::ErrorPayload === attachment
+        break yield(attachment)
+      end
 
       flags = @appending ? [ :WRONLY, :APPEND ] : [:WRONLY, :TRUNC, :CREATE]
+      total = 0
       
       attachment.open(target, gid: gid, flags:) do |file|
-        raise file if RuntimeError === file
-
-        acc = reader.reduce([0, write_offset]) do |(total, offset), data_block|
+        NonoP.vputs { "File #{target} #{file.class} #{file.ready? rescue '--'}" }
+        if Exception === file || NonoP::ErrorPayload === file
+          break yield(file)
+        end
+        
+        acc = reader.reduce([0, write_offset]) do |(per_total, offset), data_block|
           if data_block
-            count = file.write(data_block, offset: offset)
-            [ total + count, offset + count ]
+            begin
+              count = file.write(data_block, offset: offset)
+              [ per_total + count, offset + count ]
+            rescue
+              # todo test this rescue
+              break yield($!)
+            end
           else
-            [ total, offset ]
+            [ per_total, offset ]
           end
         end
+        total += acc[0]
+      end.wait
 
-        yield(*acc)
-      end
-    end
+      yield(total)
+    end.wait
   end    
 
 
@@ -94,7 +117,6 @@ class PutCommand < NonoP::Command::Client
         y << data
       end until data == nil || data.empty?
     rescue IOError
-      return nil
     end
   end
   

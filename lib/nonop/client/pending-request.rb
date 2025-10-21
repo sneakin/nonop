@@ -19,11 +19,14 @@ class NonoP::Client
     delegate :tag, to: :packet
     
     def accept v
-      super(@handler.call(v))
+      ready?? value : super(@handler.call(v))
+    rescue
+      reject($!)
     end
     
     def reject v
-      super(@handler.call(v))
+      ready?? self : super(SG::Defer::Acceptorable === @handler ?
+                           @handler.reject(v) : v)
     end
   end
   

@@ -11,15 +11,17 @@ module NonoP
   class RemoteFile
     attr_reader :attachment, :path, :flags, :io
 
-    def initialize path, attachment:, flags: nil, fid: nil, mode: nil, gid: nil, &blk
+    def initialize path, attachment:, fid: nil, flags: nil, mode: nil, gid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
       @flags = NonoP::OpenFlags.new(flags || :RDONLY)
-      @fid = fid || client.next_fid
-      @io = RemoteIO.new(client, @fid, path)
-      @open_req = open(mode: mode, gid: gid, &blk)
+      @io = RemoteIO.new(client, fid || client.next_fid, @path)
+      @reqs = NonoP::Client::PendingRequests.new(client)
+      open(mode: mode, gid: gid, &blk)
     end
 
+    def fid; io.fid; end
+    
     def client
       attachment.client
     end
@@ -29,38 +31,40 @@ module NonoP
     end
 
     def open mode: nil, gid: nil, &blk
-      attachment.walk(@path, nfid: @fid) do |pkt|
+      @reqs << attachment.walk(@path, nfid: fid) do |pkt|
         NonoP.vputs { "Walked to #{@path} #{@flags} #{@flags & :CREATE} #{@path.size} #{pkt.inspect}" }
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
-            client.clunk(@fid) do 
+            @reqs << client.clunk(fid) do 
               if @flags & :CREATE
-                create(mode: mode, gid: gid, &blk).wait
+                create(mode: mode, gid: gid, &blk)
               else
                 NonoP.maybe_call(blk, WalkError.new(2, @path.parent(pkt.nwqid, from_top: true)))
               end
-            end.wait
+            end
           else
-            client.track_fid(@fid) { self.close }
-            client.request(NonoP::L2000::Topen.new(fid: @fid,
-                                                   flags: @flags)) do |pkt|
+            client.track_fid(fid) { self.close }
+            @reqs << client.request(NonoP::L2000::Topen.
+                                   new(fid: fid,
+                                       flags: @flags)) do |pkt|
               if ErrorPayload === pkt
                 NonoP.maybe_call(blk, OpenError.new(pkt))
               else
                 @ready = true
                 NonoP.maybe_call(blk, self)
               end
-            end.wait
+            end
           end
-        when Error then blk ? blk.call(pkt) : raise(pkt)
-        else blk ? blk.call(TypeError.new(pkt)) : raise(TypeError.new(pkt.class.to_s))
+        when ErrorPayload then NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt))
+        else raise TypeError.new(pkt)
         end
       end
     end
 
     def wait
-      @open_req.wait
+      NonoP.vputs { "File wait: #{ready?} #{@reqs.size}" }
+      @reqs.wait unless @reqs.empty? || ready?
       self
     end
     
@@ -69,22 +73,31 @@ module NonoP
     end
 
     def create mode: nil, gid: nil, &blk
-      attachment.walk(@path.parent, nfid: @fid) do |pkt|
+      @reqs << attachment.walk(@path.parent, nfid: fid) do |pkt|
         case pkt
         when Rwalk then
-          client.track_fid(@fid) { self.close }
-          client.request(L2000::Tcreate.new(fid: @fid,
-                                            name: NString.new(@path.basename),
-                                            flags: @flags,
-                                            mode: mode || 0644,
-                                            gid: gid || 0)) do |pkt|
-            case pkt
-            when ErrorPayload then NonoP.maybe_call(blk, CreateError.new(pkt, path))
-            else NonoP.maybe_call(blk, self)
+          if pkt.nwqid < @path.size - 1
+            # todo test creating in directories that do not exist
+            NonoP.maybe_call(blk, CreateError.new(pkt, path))
+          else
+            client.track_fid(fid) { self.close }
+            @reqs << client.request(L2000::Tcreate.
+                                   new(fid: fid,
+                                       name: NString.new(@path.basename),
+                                       flags: @flags,
+                                       mode: mode || 0644,
+                                       gid: gid || 0)) do |pkt|
+              case pkt
+              when Rcreate
+                @ready = true
+                NonoP.maybe_call(blk, self)
+              when ErrorPayload then NonoP.maybe_call(blk, CreateError.new(pkt, path))
+              else raise TypeError.new(pkt)
+              end
             end
           end
-        when ErrorPayload then blk.call(WalkError.new(pkt, path))
-        else blk ? blk.call(TypeError.new(pkt)) : raise(TypeError.new(pkt))
+        when ErrorPayload then NonoP.maybe_call(blk, WalkError.new(pkt, path))
+        else raise TypeError.new(pkt)
         end
       end
     end
@@ -107,17 +120,6 @@ module NonoP
 
     def write_one data, offset: 0, &blk
       @io.write_one(data, offset:, &blk)
-    end
-
-    def wrap_error_or_data pkt, error = Error
-      case pkt
-      when ErrorPayload then error.new(pkt, path)
-      else pkt.data
-      end
-    end
-
-    def retself value, child
-      value.equal?(child) ? self : value
     end
   end
 end

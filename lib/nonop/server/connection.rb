@@ -217,6 +217,7 @@ module NonoP::Server
     def on_write pkt
       stream = @open_fids.fetch(pkt.data.fid)
       stream.write(pkt.data.data, pkt.data.offset) do |count|
+        NonoP.vputs("on write", count.inspect)
         reply_to(pkt, NonoP::Rwrite.new(count: count))
       end
     rescue KeyError
