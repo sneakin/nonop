@@ -126,7 +126,6 @@ module NonoP::Server
       while dir && !rest.empty?
         head, rest = rest.split_at(1)
         head = head.first
-        NonoP.vputs { "Finding #{head.inspect} / #{rest.inspect}" }
         ent = dir.entries[head]
         parts << ent if ent
         dir = ent

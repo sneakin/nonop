@@ -49,16 +49,17 @@ module NonoP
       tags << tag if tag
       result = pop_waiting_result(tags)
       return result if result
-      
+
       tags.each { @waiting_tags[_1] = true }
       @stop_loop = false
+
       begin
         pkt = process_one
       end until(tags.include?(pkt.tag) ||
               tags.any? { !@waiting_tags[_1] } ||
               @stop_loop ||
               closed?)
-      
+
       tags.each { @waiting_tags.delete(_1) }
       pop_waiting_result(tags)
     rescue IOError
@@ -74,13 +75,10 @@ module NonoP
       pkt = read_one
       NonoP.vputs { "Processing #{pkt.tag} #{@waiting_tags.keys.inspect}" }
       fn = @handlers.delete(pkt.tag) || method(:on_packet)
-      # todo reject errors
-      # @live_tags[pkt.tag] = pkt
       @waiting_results[pkt.tag] = pkt if @waiting_tags.delete(pkt.tag)
       ret = fn.accept(pkt.data)
       NonoP.vputs { "Processed #{pkt.tag} #{@waiting_tags.keys.inspect}" }
       raise ret if Exception === ret
-      # raise Error.new(ret) if ErrorPayload === ret
       pkt
     rescue
       NonoP.vputs { [ "Threw #{$!.class}: #{$!}", *$!.backtrace ] }
@@ -190,12 +188,7 @@ module NonoP
     end
     
     def wait_for_auth
-      NonoP.vputs { "Waiting? #{@in_auth} #{@auth_prom} #{@auth_prom&.ready?}" }
-      if !@in_auth && @auth_prom != nil && !@auth_prom.ready?
-        NonoP.vputs { "Waiting!! #{@in_auth} #{@auth_prom} #{@auth_prom&.ready?}" }
-        @auth_prom.wait
-        @in_auth = false
-      end
+      @auth_prom.wait if !@in_auth && @auth_prom != nil && !@auth_prom.ready?
     end
     
     def auth(uname:, n_uname:, aname:, credentials:)
@@ -210,7 +203,8 @@ module NonoP
         and_then { write_creds(credentials, _1.wait) }.
         and_then { |io| auth_attach(uname:, aname:, n_uname:, afid: io.fid).
                    wait.tap { |a| track_fid(a.fid) { a.close }; io.close } }.
-        and_then { update_state(uname:, aname:, n_uname:, attachment: _1) }
+        and_then { update_state(uname:, aname:, n_uname:, attachment: _1) }.
+        and_then { @in_auth = false; _1 }
     end
     
     def clunk fid, &blk
@@ -246,7 +240,6 @@ module NonoP
     private
 
     def send_auth(uname:, n_uname:, aname:)
-      NonoP.vputs { "Authenticating #{uname.inspect} #{n_uname.inspect}" }
       auth_fid = next_fid
       request(L2000::Tauth.new(afid: auth_fid,
                                uname: NString.new(uname),
@@ -262,12 +255,10 @@ module NonoP
     end
     
     def write_creds credentials, afid
-      NonoP.vputs { "write creds" }
       # write credentials to afid
       req = nil
       io = RemoteIO.new(self, afid, 'auth')
       req = io.write(credentials) do |total, errs|
-        NonoP.vputs { "SENT AUTH: #{total} #{errs&.size}" }
         raise errs[0] unless errs == nil || errs.empty?
         io
       end.wait
@@ -275,7 +266,6 @@ module NonoP
     end
 
     def update_state uname:, n_uname:, aname:, attachment:
-        NonoP.vputs { "Updating state #{uname} #{aname}" }
       @authenticated[aname] = { uname:, n_uname:, aname:, attachment: }
       :yes
     end
