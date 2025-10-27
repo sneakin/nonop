@@ -43,7 +43,7 @@ module NonoP::Server::FileSystem
                when NonoP::OpenFlags[:RDWR] then 'rb+'
                else 'rb'
                end
-        mode[0] = 'a' if (p9_mode & :APPEND) || path.pipe?
+        mode[0] = 'a' if (p9_mode & :APPEND) # || path.pipe?
         mode[2] = '+' if path.pipe?
         NonoP.vputs { "   mode #{mode}" }
         

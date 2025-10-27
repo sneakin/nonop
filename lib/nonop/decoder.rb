@@ -106,9 +106,9 @@ module NonoP
     def send_one pkt, io
       pkt.type = @packet_types_inv[pkt.coder]
       raise TypeError.new("Unhandled packet type: #{pkt.coder}") unless pkt.type
-      NonoP.vputs { "<< %s %i %s\n\t%s" % [ pkt.type, pkt.tag, pkt.size, pkt.inspect ] }
+      NonoP.vputs { "<< %s %i %s\n\t%s" % [ pkt.type, pkt.tag, pkt.size, pkt.inspect[0, 240] ] }
       data = pkt.pack
-      NonoP.vputs { "   %s %i %s" % [ pkt.coder, data.size, data.inspect ] }
+      # NonoP.vputs { "   %s %i %s" % [ pkt.coder, data.size, data.inspect ] }
       io.write(data)
     end
 
@@ -120,7 +120,7 @@ module NonoP
         raise DecodeError.new(-1, nil, nil)
       end
       pkt.coder = packet_types[pkt.type]
-      NonoP.vputs { ">> %s %s %s" % [ pkt.type, pkt.tag, pkt.data.inspect ] }
+      NonoP.vputs { ">> %s %s %s" % [ pkt.type, pkt.tag, pkt.data.inspect[0, 240] ] }
       raise DecodeError.new(-1, pkt, more) if NopDecoder === pkt.coder || !more.blank?
       pkt
 

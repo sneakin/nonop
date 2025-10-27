@@ -33,4 +33,13 @@ module ClientHelper
       Hash[[ :at, :contents ].zip(path_body)]
     end
   end
+
+  def read_back(path, amount)
+    # todo File.open like block w/ close
+    # r = nil
+    attachment.open(path) do |rio|
+      rio.read(amount).tap { rio.close.wait }
+    end.wait
+  end
+  
 end

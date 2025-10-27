@@ -7,7 +7,17 @@ require_relative '../remote-path'
 
 module NonoP
   class RemoteIO
+    class Error < NonoP::Error
+    end
+    
+    class ClosedError < Error
+      def initialize fid
+        super("FID #{fid} is closed.")
+      end
+    end
+
     attr_reader :client, :fid, :path
+    predicate :closed
 
     def initialize client, fid, path
       @client = client
@@ -16,6 +26,8 @@ module NonoP
     end
 
     def close &blk
+      return self if closed?
+      closed!
       client.clunk(fid, &blk)
     end
 
@@ -24,6 +36,7 @@ module NonoP
     def read length, offset: 0, &blk
       raise ArgumentError.new("Length %i must be 1...%i" % [ length, client.max_datalen ]) unless (1..client.max_datalen) === length
       raise ArgumentError.new("Offset must be positive") if offset < 0
+      raise ClosedError.new(self.fid) if closed?
 
       client.request(NonoP::Tread.new(fid: fid,
                                       offset: offset,
@@ -33,21 +46,22 @@ module NonoP
         else
           NonoP.maybe_call(blk, pkt.data)
         end
-      end.skip_unless(blk == nil).wait
+      end.skip_when(blk).wait
     end
 
     def write data, offset: 0, length: nil, &blk
       raise ArgumentError.new("Offset must be positive") if offset < 0
-
+      raise ClosedError.new(self.fid) if closed?
+      
       # Multiple write requests can made. They're collected
       # and reduced to a total byte count and any errors.
       requests = NonoP::Client::PendingRequests.new(client).
         after do |results|
-        results.reduce([0, []]) do |(total, errs), pkt|
-          if ErrorPayload === pkt
+        results.reduce([0, []]) do |(total, errs), cnt|
+          if ErrorPayload === cnt
             [ total, errs << pkt ]
           else
-            [ total + pkt.count, errs ]
+            [ total + cnt, errs ]
           end
         end.then { NonoP.maybe_call(blk, *_1) }
       end
@@ -57,9 +71,11 @@ module NonoP
       block_size = client.max_datalen
       # Write the data out block by block:
       requests = NonoP.block_string(data, block_size, length: length).
-        reduce(requests) do |acc, to_send|
+        reduce(requests) do |acc, to_send| # todo yield the offset too?
         next acc if to_send == nil || to_send.empty?
         acc << write_one(to_send, offset: offset)
+        offset += to_send.bytesize
+        acc
       end
 
       if blk

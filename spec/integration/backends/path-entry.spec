@@ -66,13 +66,13 @@ describe 'server exporting a RW PathEntry' do
     w.it_should_behave_like 'server allowing Twalk', path: Paths.fetch(:rw)[0], badpath: Paths.fetch(:noexist)[0]
     w.it_should_behave_like('server allowing Tlopen', paths: Paths)
     w.it_should_behave_like 'server allowing Tread', paths: Paths
+    w.it_should_behave_like 'server allowing Twrite', paths: Paths
     
     if SPEC_DRIVER != 'client'
       w.it_should_behave_like 'server allowing Topen'
 
       w.it_should_behave_like 'server allowing Tlcreate'
 
-      w.it_should_behave_like 'server allowing Twrite'
       w.it_should_behave_like 'server allowing Tflush'
       w.it_should_behave_like 'server allowing Tfsync'
       w.it_should_behave_like 'server allowing Tstatfs'

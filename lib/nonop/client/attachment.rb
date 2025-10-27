@@ -8,6 +8,7 @@ module NonoP
   class Attachment
     attr_reader :qid, :client
     attr_reader :fid, :afid, :uname, :n_uname, :aname
+    predicate :ready
 
     def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, &blk
       @client = client
@@ -29,8 +30,8 @@ module NonoP
         when Rattach then
           client.track_fid(@fid)
           @qid = pkt.aqid
-          @ready = true
-          blk&.call(self)
+          ready!
+          NonoP.maybe_call(blk, self)
         else raise TypeError.new(pkt)
         end
       end
@@ -38,21 +39,18 @@ module NonoP
 
     def wait
       @attach_req.wait
-      self
+      # self
     end
     
-    def ready?
-      @ready
-    end
-
     def close &blk
-      @ready = false
+      unready!
       client.clunk(@fid, &blk)
     end
 
-    def open *a, **o, &blk
+    def open *a, mode: nil, gid: nil, **o, &blk
       raise NotReady unless ready?
-      RemoteFile.new(*a, **o.merge(attachment: self), &blk)
+      RemoteFile.new(*a, **o.merge(attachment: self)).
+        open(mode:, gid:, &blk)
     end
 
     def opendir *a, **o, &blk

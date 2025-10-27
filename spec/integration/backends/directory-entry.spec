@@ -42,13 +42,13 @@ describe 'server exporting a RW DirectoryEntry via a HashFileSystem' do
     w.it_should_behave_like 'server allowing Twalk', path: paths.fetch(:rw)[0], badpath: paths.fetch(:noexist)[0]
     w.it_should_behave_like('server allowing Tlopen', paths: paths)
     w.it_should_behave_like 'server allowing Tread', paths: paths
+    w.it_should_behave_like 'server allowing Twrite', paths: paths
 
     if SPEC_DRIVER != 'client'
       w.it_should_behave_like 'server allowing Topen'
 
       w.it_should_behave_like 'server allowing Tlcreate'
 
-      w.it_should_behave_like 'server allowing Twrite'
       w.it_should_behave_like 'server allowing Tflush'
       w.it_should_behave_like 'server allowing Tfsync'
       w.it_should_behave_like 'server allowing Tstatfs'

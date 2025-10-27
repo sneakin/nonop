@@ -4,7 +4,7 @@ using SG::Ext
 require_relative '../helper'
 
 shared_examples_for 'server allowing Twrite' do
-  |state:|
+  |state:, paths:|
 
   include ClientHelper
 

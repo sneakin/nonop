@@ -68,10 +68,12 @@ shared_examples_for 'Tread on a file' do
         end
       end
       describe 'read larger than max msglen' do
-        it 'errors' do
-          expect(client.request(NonoP::Tread.
-                                new(fid: fid, count: 0xFFFFFFFF, offset: 0)).wait).
-            to be_kind_of(NonoP::ErrorPayload)
+        it 'reads what it can' do
+          client.request(NonoP::Tread.
+                         new(fid: fid, count: 0xFFFFFFFF, offset: 0)) do |pkt|  
+            expect(pkt).to be_kind_of(NonoP::Rread)
+            expect(pkt.data).to eql(contents)
+          end
         end
         xit 'but it could reply w/ multiple packets'
       end

@@ -10,14 +10,14 @@ require_relative '../open-flags'
 module NonoP
   class RemoteFile
     attr_reader :attachment, :path, :flags, :io
+    predicate :ready
 
-    def initialize path, attachment:, fid: nil, flags: nil, mode: nil, gid: nil, &blk
+    def initialize path, attachment:, fid: nil, flags: nil
       @path = RemotePath.new(path)
       @attachment = attachment
       @flags = NonoP::OpenFlags.new(flags || :RDONLY)
       @io = RemoteIO.new(client, fid || client.next_fid, @path)
-      @reqs = NonoP::Client::PendingRequests.new(client)
-      open(mode: mode, gid: gid, &blk)
+      @reqs = NonoP::Client::PendingRequests.new(client).after(&:last)
     end
 
     def fid; io.fid; end
@@ -48,30 +48,28 @@ module NonoP
             @reqs << client.request(NonoP::L2000::Topen.
                                    new(fid: fid,
                                        flags: @flags)) do |pkt|
+              NonoP.vputs("Post walk: #{self} #{fid} #{ready?.inspect} #{@reqs.size}")
               if ErrorPayload === pkt
                 NonoP.maybe_call(blk, OpenError.new(pkt))
               else
-                @ready = true
+                ready!
                 NonoP.maybe_call(blk, self)
               end
             end
           end
-        when ErrorPayload then NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt))
+        when ErrorPayload then NonoP.maybe_call(blk, pkt)
         else raise TypeError.new(pkt)
         end
       end
+      self
     end
 
     def wait
-      NonoP.vputs { "File wait: #{ready?} #{@reqs.size}" }
-      @reqs.wait unless @reqs.empty? || ready?
-      self
+      NonoP.vputs { "File wait: #{ready?.inspect} #{@reqs.size}" }
+      @reqs.wait.tap { NonoP.vputs("  Waited for #{@reqs.size} #{_1.inspect}") } if !@reqs.empty?
+      # self
     end
     
-    def ready?
-      @ready
-    end
-
     def create mode: nil, gid: nil, &blk
       @reqs << attachment.walk(@path.parent, nfid: fid) do |pkt|
         case pkt
@@ -89,7 +87,7 @@ module NonoP
                                        gid: gid || 0)) do |pkt|
               case pkt
               when Rcreate
-                @ready = true
+                ready!
                 NonoP.maybe_call(blk, self)
               when ErrorPayload then NonoP.maybe_call(blk, CreateError.new(pkt, path))
               else raise TypeError.new(pkt)
@@ -104,7 +102,7 @@ module NonoP
 
     def close &blk
       r = @io.close(&blk)
-      @ready = false
+      unready!
       r
     end
 

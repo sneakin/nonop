@@ -10,7 +10,13 @@ module NonoP
     
     def initialize err, msg = nil
       @code = err
-      @sys = SystemCallError.new(msg, Integer === err ? err : err.code)
+      @sys = SystemCallError.new(msg,
+                                 case err
+                                 when Integer then err
+                                 when SystemCallError then err.errno
+                                 when ErrorPayload then err.code
+                                 else err
+                                 end)
       super(@sys.message)
     end
   end

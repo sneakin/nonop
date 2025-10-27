@@ -61,7 +61,8 @@ class NonoP::Client
     end
 
     def produce_one
-      @client.process_until(tags: pending_tags).tap do |tag, r|
+      @client.process_until(tags: pending_tags, packets: false).tap do |tag, r|
+        NonoP.vputs { "Pending Requests #{tag} #{r.class}" }
         @results << r
         @pending.delete_if { _1.tag == tag }
       end

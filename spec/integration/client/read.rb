@@ -16,16 +16,18 @@ shared_examples_for 'Tread on a file' do
         expect(io).to_not be_ready
         expect { io.read(16) }.to raise_error(NonoP::ReadError)
       end
-      describe 'closed' do
-        before do
-          io.wait.close.wait
-        end
+    end
+    
+    describe 'opening and closing' do
+      before do
+        io.wait.close.wait
+      end
 
-        it 'errors' do
-          expect { io.read(16) }.to raise_error(NonoP::ReadError)
-        end
+      it 'errors on read' do
+        expect { io.read(16) }.to raise_error(NonoP::RemoteIO::ClosedError)
       end
     end
+    
     describe 'open for reading' do
       before do
         expect { io.wait }.to_not raise_error
@@ -49,8 +51,8 @@ shared_examples_for 'Tread on a file' do
         end
       end
       describe 'read larger than max msglen' do
-        it 'errors' do
-          expect { io.read(client.max_msglen) }.to raise_error(ArgumentError)
+        it 'reads what it can' do
+          expect(io.read(0xFFFFFFFF)).to eql(contents)
         end
         
         xit 'but it could reply w/ multiple packets'

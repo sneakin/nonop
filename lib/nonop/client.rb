@@ -44,10 +44,10 @@ module NonoP
       false
     end
 
-    def process_until tag: nil, tags: nil
+    def process_until tag: nil, tags: nil, packets: true
       tags ||= []
       tags << tag if tag
-      result = pop_waiting_result(tags)
+      result = pop_waiting_result(tags, packets:)
       return result if result
 
       tags.each { @waiting_tags[_1] = true }
@@ -61,22 +61,25 @@ module NonoP
               closed?)
 
       tags.each { @waiting_tags.delete(_1) }
-      pop_waiting_result(tags)
+      pop_waiting_result(tags, packets:)
     rescue IOError
       nil
     end
 
-    def pop_waiting_result tags
+    def pop_waiting_result tags, packets: true
       ready_tag = tags.find { @waiting_results[_1] }
-      [ ready_tag, @waiting_results.delete(ready_tag)&.data ] if ready_tag
+      [ ready_tag, @waiting_results.delete(ready_tag)&.then { packets ? _1[0].data : _1[1] } ] if ready_tag
     end
     
     def process_one
       pkt = read_one
       NonoP.vputs { "Processing #{pkt.tag} #{@waiting_tags.keys.inspect}" }
       fn = @handlers.delete(pkt.tag) || method(:on_packet)
-      @waiting_results[pkt.tag] = pkt if @waiting_tags.delete(pkt.tag)
+      is_waiting = @waiting_tags.delete(pkt.tag)
+      @waiting_results[pkt.tag] = [ pkt ] if is_waiting
       ret = fn.accept(pkt.data)
+      # PendingRequests need the handlers' return value
+      @waiting_results[pkt.tag] << ret if is_waiting && @waiting_results.has_key?(pkt.tag)
       NonoP.vputs { "Processed #{pkt.tag} #{@waiting_tags.keys.inspect}" }
       raise ret if Exception === ret
       pkt
@@ -202,7 +205,7 @@ module NonoP
         and_then { send_auth(uname:, aname:, n_uname:) }.
         and_then { write_creds(credentials, _1.wait) }.
         and_then { |io| auth_attach(uname:, aname:, n_uname:, afid: io.fid).
-                   wait.tap { |a| track_fid(a.fid) { a.close }; io.close } }.
+                   tap { |a| a.wait; track_fid(a.fid) { a.close }; io.close } }.
         and_then { update_state(uname:, aname:, n_uname:, attachment: _1) }.
         and_then { @in_auth = false; _1 }
     end
