@@ -132,6 +132,10 @@ module NonoP
         "%%%s[%s]" % [ prefix, to_a.collect(&:to_s).join(', ') ]
       end
 
+      def inspect
+        "\#<%s:%#.16x %s>" % [ self.class.name, self.object_id, to_a.inspect ]
+      end
+
       alias :to_i :value
 
       # @param other [Object]
