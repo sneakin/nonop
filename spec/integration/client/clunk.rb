@@ -14,8 +14,8 @@ shared_examples_for 'server allowing Tclunk' do
 
   describe 'before auth' do
     it 'errors' do
-      expect(client.clunk(0).wait).
-        to be_kind_of(NonoP::ClunkError) # todo Rerror until Tversion
+      expect { client.clunk(0).wait }.
+        to raise_error(NonoP::ClunkError) # todo Rerror until Tversion
     end
   end
 
@@ -42,8 +42,8 @@ shared_examples_for 'server allowing Tclunk' do
     end
     describe 'any other' do
       it 'errors' do
-        expect(client.clunk(789).wait).
-          to be_kind_of(NonoP::ClunkError)
+        expect { client.clunk(789).wait }.
+          to raise_error(NonoP::ClunkError)
       end
     end      
   end
@@ -76,13 +76,13 @@ shared_examples_for 'server allowing Tclunk' do
       end
 
       it 'can not clunk the afid' do
-        expect(client.clunk(state.afid).wait).
-          to be_kind_of(NonoP::ClunkError)
+        expect { client.clunk(state.afid).wait }.
+          to raise_error(NonoP::ClunkError)
       end
 
       it 'errors on other fids' do
-        expect(client.clunk(789).wait).
-          to be_kind_of(NonoP::ClunkError)
+        expect { client.clunk(789).wait }.
+          to raise_error(NonoP::ClunkError)
       end
 
       describe 'after a walk nowhere' do
@@ -106,7 +106,7 @@ shared_examples_for 'server allowing Tclunk' do
           expect(client.request(NonoP::Twalk.
                                 new(fid: attachment_fid,
                                     newfid: 2,
-                                    wnames: patt.split('/').collect { NonoP::NString[_1] })).wait).
+                                    wnames: path.split('/').collect { NonoP::NString[_1] })).wait).
             to be_kind_of(NonoP::Rwalk)
         end
         
