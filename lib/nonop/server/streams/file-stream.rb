@@ -119,6 +119,12 @@ module NonoP::Server
       self
     end
 
+
+    # @return [Hash(Symbol, Obkect)]
+    def statfs
+      { fsid: fsid }.merge(fs.statfs)
+    end
+
     private
 
     def setattr_value data, bit, value
@@ -137,11 +143,6 @@ module NonoP::Server
     def setattr_nsec data, now_bit, set_bit, field
       setattr_value(data, now_bit,
                     0 == (data.valid & NonoP::L2000::Tsetattr::Bits[set_bit]) ? Time.now.nsec : data[field])
-    end
-
-    # @return [Hash(Symbol, Obkect)]
-    def statfs
-      { fsid: fsid }.merge(fs.statfs)
     end
   end
 end
