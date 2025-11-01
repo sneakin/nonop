@@ -103,13 +103,20 @@ module NonoP::Server
       path = RemotePath.new(path) if String === path
       i = next_id
       NonoP.vputs { "Walking #{i} to #{path} #{old_fsid}" }
-      steps, entry = find_entry(path, old_fsid != nil && old_fsid != 0 ? fsids.fetch(old_fsid).entry : nil)
-      fsids[i] = if entry
-                    FileSystem::FSID.new(path, entry)
-                  else
-                    FileSystem::FSID.new(path, steps.last || root)
-                  end
-      [ steps.collect(&:qid), i ]
+      if path&.empty? && old_fsid && fsids.has_key?(old_fsid)
+        fsids[i] = fsids[old_fsid].dup
+        [ [], i ]
+      else
+        steps, entry = find_entry(path,
+                                  old_fsid != nil && old_fsid != 0 ?
+                                    fsids.fetch(old_fsid).entry : nil)
+        fsids[i] = if entry
+                     FileSystem::FSID.new(path, entry)
+                   else
+                     FileSystem::FSID.new(path, steps.last || root)
+                   end
+        [ steps.collect(&:qid), i ]
+      end
     end
 
     # @param path [String, Array<String>, RemotePath]
