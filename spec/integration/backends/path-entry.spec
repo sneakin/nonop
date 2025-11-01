@@ -1,6 +1,9 @@
 require 'sg/ext'
 using SG::Ext
 
+require 'nonop/ext/statfs'
+using NonoP::Ext::StatFS
+
 require_relative 'helper'
 
 describe 'server exporting a RW PathEntry' do
@@ -67,6 +70,8 @@ describe 'server exporting a RW PathEntry' do
     w.it_should_behave_like('server allowing Tlopen', paths: Paths)
     w.it_should_behave_like 'server allowing Tread', paths: Paths
     w.it_should_behave_like 'server allowing Twrite', paths: Paths
+    w.it_should_behave_like('server allowing Tstatfs',
+                            stats: File.statfs(Paths.fetch(:rw)[0]))
     
     if SPEC_DRIVER != 'client'
       w.it_should_behave_like 'server allowing Topen'
@@ -75,7 +80,6 @@ describe 'server exporting a RW PathEntry' do
 
       w.it_should_behave_like 'server allowing Tflush'
       w.it_should_behave_like 'server allowing Tfsync'
-      w.it_should_behave_like 'server allowing Tstatfs'
       w.it_should_behave_like 'server allowing Tgetattr'
       w.it_should_behave_like 'server allowing Tsetattr'
       w.it_should_behave_like 'server allowing Tlock'

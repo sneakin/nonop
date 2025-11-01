@@ -4,35 +4,42 @@ using SG::Ext
 require_relative 'remote-file'
 require_relative 'remote-dir'
 
+# todo client module
+
 module NonoP
   class Attachment
     attr_reader :qid, :client
     attr_reader :fid, :afid, :uname, :n_uname, :aname
     predicate :ready
 
-    def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, &blk
+    def initialize client:, fid: nil, afid: nil, uname: nil, n_uname: nil, aname:, qid: nil, &blk
       @client = client
       @fid = fid || client.next_fid
       @afid = afid || -1
       @uname = uname || ''
       @n_uname = n_uname || -1
       @aname = aname
-      @attach_req = client.request(NonoP::L2000::Tattach.
-                                   new(fid: @fid,
-                                       afid: @afid,
-                                       uname: NonoP::NString.new(uname),
-                                       aname: NonoP::NString.new(aname),
-                                       n_uname: n_uname)) do |pkt|
-        case pkt
-        when ErrorPayload then
-          err = (@afid == 0xFFFFFFFF ? AuthError : AttachError).new(pkt)
-          blk ? blk.call(err) : raise(err)
-        when Rattach then
-          client.track_fid(@fid)
-          @qid = pkt.aqid
-          ready!
-          NonoP.maybe_call(blk, self)
-        else raise TypeError.new(pkt)
+      if qid
+        @qid = qid
+        ready!
+      else
+        @attach_req = client.request(NonoP::L2000::Tattach.
+                                     new(fid: @fid,
+                                         afid: @afid,
+                                         uname: NonoP::NString.new(uname),
+                                         aname: NonoP::NString.new(aname),
+                                         n_uname: n_uname)) do |pkt|
+          case pkt
+          when ErrorPayload then
+            err = (@afid == 0xFFFFFFFF ? AuthError : AttachError).new(pkt)
+            blk ? blk.call(err) : raise(err)
+          when Rattach then
+            client.track_fid(@fid)
+            @qid = pkt.aqid
+            ready!
+            NonoP.maybe_call(blk, self)
+          else raise TypeError.new(pkt)
+          end
         end
       end
     end
@@ -100,6 +107,10 @@ module NonoP
         else raise TypeError.new(pkt.class)
         end
       end
+    end
+
+    def statfs &blk
+      client.request(NonoP::L2000::Tstatfs.new(fid: fid), &blk)
     end
   end
 end

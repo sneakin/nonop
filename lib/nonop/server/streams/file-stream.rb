@@ -138,5 +138,10 @@ module NonoP::Server
       setattr_value(data, now_bit,
                     0 == (data.valid & NonoP::L2000::Tsetattr::Bits[set_bit]) ? Time.now.nsec : data[field])
     end
+
+    # @return [Hash(Symbol, Obkect)]
+    def statfs
+      { fsid: fsid }.merge(fs.statfs)
+    end
   end
 end

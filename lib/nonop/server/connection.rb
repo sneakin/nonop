@@ -84,6 +84,7 @@ module NonoP::Server
       NonoP::L2000::Treaddir => :on_readdir,
       NonoP::L2000::Tgetattr => :on_getattr,
       NonoP::L2000::Tsetattr => :on_setattr,
+      NonoP::L2000::Tstatfs => :on_statfs,
     }
 
     # @return [self]
@@ -364,6 +365,18 @@ module NonoP::Server
       stats = stream.setattr(pkt.data)
       NonoP.vputs { "   #{stats.inspect}" }
       reply_to(pkt, NonoP::L2000::Rsetattr.new())
+    rescue KeyError
+      reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
+    rescue SystemCallError
+      reply_to(pkt, NonoP::L2000::Rerror.new($!))
+    end
+
+    # @return [void]
+    def on_statfs pkt
+      stream = @open_fids.fetch(pkt.data.fid)
+      NonoP.vputs("Statfs #{pkt.data.fid} #{stream.class}")
+      stats = stream.statfs
+      reply_to(pkt, NonoP::L2000::Rstatfs.new(**stats))
     rescue KeyError
       reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
     rescue SystemCallError

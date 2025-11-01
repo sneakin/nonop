@@ -206,5 +206,12 @@ module NonoP::Server
     rescue KeyError
       raise Errno::EBADFD
     end
+
+    # @abstract
+    # @return [Hash(Symbol, Obkect)]
+    def statfs
+      NonoP.vputs { "HFS statfs: #{root.class}" }
+      root.statfs
+    end
   end
 end

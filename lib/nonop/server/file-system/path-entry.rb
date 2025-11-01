@@ -1,7 +1,8 @@
 require 'sg/ext'
 using SG::Ext
 
-require 'pathname'
+require 'nonop/ext/statfs'
+using NonoP::Ext::StatFS
 
 module NonoP::Server::FileSystem
   # File backed entry with read and write support.
@@ -263,5 +264,10 @@ module NonoP::Server::FileSystem
       self
     end
 
+    # @return [Hash(Symbol, Obkect)]
+    def statfs
+      path.statfs.to_hash
+
+    end
   end
 end

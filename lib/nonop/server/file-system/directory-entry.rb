@@ -40,7 +40,25 @@ module NonoP::Server::FileSystem
       super.merge!({writeable: writeable?,
                      dynamic: @entry_generator != nil})
     end
-    
+
+    def statfs
+      ents = entries
+      size = ents.sum(&:size)
+      {
+        type: 0x01021997, # V9FS magic
+        bsize: 4096,
+        blocks: size / 4096,
+        bfree: 0,
+        bavail: 0,
+        files: ents.size,
+        ffree: 0,
+        fsid: 0,
+        namelen: 255,
+        frsize: 0,
+        flags: 0
+      }
+    end
+
     def make_entry name, data
       case data
       when Entry then data.tap { _1.umask = umask }

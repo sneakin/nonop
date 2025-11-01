@@ -43,6 +43,7 @@ describe 'server exporting a RW DirectoryEntry via a HashFileSystem' do
     w.it_should_behave_like('server allowing Tlopen', paths: paths)
     w.it_should_behave_like 'server allowing Tread', paths: paths
     w.it_should_behave_like 'server allowing Twrite', paths: paths
+    w.it_should_behave_like 'server allowing Tstatfs', stats: { type: 0x01021997, bsize: 4096, namelen: 255 }
 
     if SPEC_DRIVER != 'client'
       w.it_should_behave_like 'server allowing Topen'
@@ -51,7 +52,6 @@ describe 'server exporting a RW DirectoryEntry via a HashFileSystem' do
 
       w.it_should_behave_like 'server allowing Tflush'
       w.it_should_behave_like 'server allowing Tfsync'
-      w.it_should_behave_like 'server allowing Tstatfs'
       w.it_should_behave_like 'server allowing Tgetattr'
       w.it_should_behave_like 'server allowing Tsetattr'
       w.it_should_behave_like 'server allowing Tlock'

@@ -137,5 +137,11 @@ module NonoP::Server::FileSystem
     def setattr fsid, attrs
       raise Errno::ENOTSUP
     end
+
+    # @abstract
+    # @return [Hash(Symbol, Obkect)]
+    def statfs
+      raise Errno::ENOTSUP
+    end
   end
 end

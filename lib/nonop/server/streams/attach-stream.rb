@@ -31,5 +31,9 @@ module NonoP::Server
     def getattr mask
       @fs.getattr(0)
     end
+
+    def statfs
+      @fs.statfs # fixme file systems need an fsid
+    end
   end
 end
