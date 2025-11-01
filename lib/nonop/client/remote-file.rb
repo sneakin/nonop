@@ -40,7 +40,7 @@ module NonoP
               if @flags & :CREATE
                 create(mode: mode, gid: gid, &blk)
               else
-                NonoP.maybe_call(blk, WalkError.new(2, @path.parent(pkt.nwqid + 1, from_top: true)))
+                NonoP.maybe_call(blk, WalkError.new(Errno::ENOENT::Errno, @path.parent(pkt.nwqid + 1, from_top: true)))
               end
             end
           else
