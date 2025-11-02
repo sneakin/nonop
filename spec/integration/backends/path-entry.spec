@@ -35,7 +35,7 @@ describe 'server exporting a RW PathEntry' do
     setup_path
   end
   
-  # fixme testing DirectoryEntry more so w/ the spec-fs; PathEntry hits real files. Paths tomfdles need to be specified; test dir setup
+  # fixme testing DirectoryEntry more so w/ the spec-fs; PathEntry hits real files. Paths to files need to be specified; test dir setup
 
   def cleanup_path
     @path.join('info').chmod(0700)
@@ -72,6 +72,12 @@ describe 'server exporting a RW PathEntry' do
     w.it_should_behave_like 'server allowing Twrite', paths: Paths
     w.it_should_behave_like('server allowing Tstatfs',
                             stats: File.statfs(Paths.fetch(:rw)[0]))
+    w.it_should_behave_like('server allowing Treaddir',
+                            paths: Paths,
+                            entries: {
+                              rwdir: Pathname.new(FSRoot.join(Paths.fetch(:rwdir))).entries.collect(&:basename).collect(&:to_s).reject(&/^[.]{1,2}$/),
+                              root: FSRoot.entries.collect(&:basename).collect(&:to_s).reject(&/^[.]{1,2}$/)
+                            })
     
     if SPEC_DRIVER != 'client'
       w.it_should_behave_like 'server allowing Topen'
@@ -92,7 +98,7 @@ describe 'server exporting a RW PathEntry' do
       w.it_should_behave_like 'server allowing Tsymlink'
       w.it_should_behave_like 'server allowing Treadlink'
       w.it_should_behave_like 'server allowing Tmkdir'
-      w.it_should_behave_like 'server allowing Treaddir'
+
       w.it_should_behave_like 'server allowing Tmknod'
       w.it_should_behave_like 'server allowing Txattrcreate'
       w.it_should_behave_like 'server allowing Txattrwalk'

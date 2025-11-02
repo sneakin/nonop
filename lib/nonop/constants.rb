@@ -1,0 +1,3 @@
+module NonoP
+  MAX_U64 = 0xFFFFFFFFFFFFFFFF
+end

@@ -222,7 +222,9 @@ module NonoP::Server::FileSystem
     # @return [Array<Dirent>]
     # @raise SystemCallError
     def readdir count, offset = 0
-      (entries.values[offset, count] || []).each_with_index.collect do |child, n|
+      # todo cache in the data provider so the fsid sees a consistent list
+      (entries.values[offset, count] || []).
+        each_with_index.collect do |child, n|
         NonoP::L2000::Rreaddir::Dirent.for_entry(child, n)
       end
     end

@@ -102,7 +102,7 @@ module NonoP::Server
     def walk path, old_fsid = nil
       path = RemotePath.new(path) if String === path
       i = next_id
-      NonoP.vputs { "Walking #{i} to #{path} #{old_fsid}" }
+      NonoP.vputs { "Walking #{i} to #{path.inspect} #{old_fsid}" }
       if path&.empty? && old_fsid && fsids.has_key?(old_fsid)
         fsids[i] = fsids[old_fsid].dup
         [ [], i ]

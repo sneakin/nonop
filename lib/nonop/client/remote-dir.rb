@@ -1,6 +1,7 @@
 require 'sg/ext'
 using SG::Ext
 
+require_relative '../constants'
 require_relative '../async'
 require_relative '../util'
 require_relative '../remote-path'
@@ -17,7 +18,7 @@ module NonoP
       @attachment = attachment
       @flags = NonoP::OpenFlags.new(flags || :DIRECTORY)
       @fid = fid || client.next_fid
-      open_self(&blk)
+      open_self(&blk).wait # todo ready like RemoteFile
     end
 
     def client
@@ -45,24 +46,26 @@ module NonoP
     def entries count: nil, offset: nil, &blk
       return to_enum(__method__, count:, offset:) unless blk
 
-      count ||= READ_SIZE
-
-      Async.reduce(0.upto(MAX_U64), offset || 0) do |n, offset, &cc| 
-        readdir(count, offset) do |dir|
+      read_size = count || READ_SIZE
+      count ||= NonoP::MAX_U64
+      
+      Async.reduce(0.upto(count), offset || 0) do |n, offset, &cc| 
+        readdir(read_size, offset) do |dir|
           if StandardError === dir
             cc.call(dir, offset)
           else
             dir.entries.each(&blk)
-            cc.call(dir.entries.size < count, offset + dir.entries.size)
+            noff = offset + dir.entries.size
+            cc.call(dir.entries.size < read_size || noff >= count, noff)
           end
         end.wait
       end
     end
 
-    def readdir count, offset = 0, &blk
+    def readdir count = nil, offset = nil, &blk
       client.request(NonoP::L2000::Treaddir.new(fid: fid,
-                                                offset: offset,
-                                                count: count)) do |result|
+                                                offset: offset || 0,
+                                                count: count || READ_SIZE)) do |result|
         NonoP.maybe_call(blk, NonoP.maybe_wrap_error(result, ReadError))
       end
     end
@@ -90,33 +93,31 @@ module NonoP
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
-            blk.call(WalkError.new(2, @path.parent(pkt.nwqid + 1, from_top: true)))
+            NonoP.maybe_call(blk, WalkError.new(2, @path.parent(pkt.nwqid + 1, from_top: true)))
           else
-            blk.call(pkt)
+            NonoP.maybe_call(blk, pkt)
           end
-        when StandardError then blk.call(pkt)
-        else blk.call(TypeError.new(pkt.class))
+        else raise TypeError.new(pkt.class)
         end
       end
     end
 
     def open_self &blk
-      return blk.call(self) if ready?
+      return NonoP.maybe_call(blk, self) if ready?
 
       walk_to_self do |pkt|
         case pkt
         when Rwalk then
           client.request(NonoP::L2000::Topen.new(fid: @fid, flags: @flags)) do |pkt|
             if ErrorPayload === pkt
-              blk.call(NonoP.maybe_wrap_error(pkt, OpenError))
+              NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, OpenError))
             else
               client.track_fid(@fid) { self.close }
               @ready = true
-              blk.call(self)
+              NonoP.maybe_call(blk, self)
             end
           end
-        when StandardError then blk.call(pkt)
-        else blk.call(TypeError.new(pkt.class))
+        else raise TypeError.new(pkt.class)
         end
       end
     end

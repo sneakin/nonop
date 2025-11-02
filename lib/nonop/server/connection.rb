@@ -335,7 +335,7 @@ module NonoP::Server
       ents = stream.readdir(pkt.data.count, pkt.data.offset).
         each.with_index.
         collect { NonoP::L2000::Rreaddir::Dirent.new(qid: _1.qid,
-                                                     offset: _2 + 1,
+                                                     offset: pkt.data.offset + _2 + 1, # todo why?
                                                      type: map_qid_to_dirent_type(_1.qid),
                                                      name: NonoP::NString.new(_1.name)) }
       reply_to(pkt, NonoP::L2000::Rreaddir.new(entries: ents))

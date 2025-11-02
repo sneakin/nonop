@@ -34,8 +34,6 @@ shared_examples_for 'server allowing Tstatfs' do
                   n_uname: state.uid,
                   credentials: state.creds)
     end
-    with_options(state: state) do |w|
-    end
 
     describe 'before attach' do
       it 'errors with bad fd' do
