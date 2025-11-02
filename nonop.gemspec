@@ -6,9 +6,11 @@ Gem::Specification.new do |s|
   #s.description = "Much longer explanation of the example!"
   s.authors     = ["Nolan Eakins <sneakin@semanticgap.com>"]
   s.email       = 'support@semanticgap.com'
-  s.files       = %w{ README.md COPYING } +
+  s.files       = %w{ README.md COPYING Rakefile nonop.gemspec Gemfile } +
     Dir.glob('bin/{nonop,server,cat,put,ls,mkdir}') +
-    Dir.glob("lib/**/*.rb")
+    Dir.glob('examples/**/*.{rb,json,yaml}') +
+    Dir.glob("lib/**/*.rb") +
+    Dir.glob('spec/**/*.{rb,spec,yaml,json}')
   s.homepage    = 'https://oss.semanticgap.com/ruby/nonop'
   s.metadata    = {
     "source_code_uri" => "https://github.com/sneakin/nonop"
