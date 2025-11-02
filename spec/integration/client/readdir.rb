@@ -42,21 +42,21 @@ shared_examples_for 'Treaddir on a directory' do
         end
 
         it 'enumerates the entries' do
-          expect(io.entries.collect(&:name).collect(&:value)).
+          expect(io.entries.collect(&SG::Fun.digger(:name, :value))).
             to eql(entries)
         end
         
         describe 'split into multiple requests' do
           it 'replies with a count of entries' do
-            expect(io.entries(count: 1).collect(&:name).collect(&:value)).
+            expect(io.entries(count: 1).collect(&SG::Fun.digger(:name, :value))).
               to eql(entries[0, 1] || [])
           end
           it 'replies with entries from an offset' do
-            expect(io.entries(offset: 1).collect(&:name).collect(&:value)).
+            expect(io.entries(offset: 1).collect(&SG::Fun.digger(:name, :value))).
               to eql(entries[1..-1] || [])
           end
           it 'replies with a count of entries from an offset' do
-            expect(io.entries(count: 1, offset: 1).collect(&:name).collect(&:value)).
+            expect(io.entries(count: 1, offset: 1).collect(&SG::Fun.digger(:name, :value))).
               to eql(entries[1, 1] || [])
           end
         end
@@ -71,7 +71,7 @@ shared_examples_for 'Treaddir on a directory' do
           }
           expect(ents.all?(&SG::Is::CaseOf[NonoP::L2000::Rreaddir::Dirent])).
             to be(true)
-          expect(ents.collect(&:name).collect(&:value)).to eql(entries)
+          expect(ents.collect(&SG::Fun.digger(:name, :value))).to eql(entries)
         end
       end
 
@@ -87,8 +87,7 @@ shared_examples_for 'Treaddir on a directory' do
         describe 'readdir w/o size and offset' do
           it 'replies with a full message of entries' do
             ents = io.readdir.wait.entries
-            NonoP.vputs { ents.inspect }
-            expect(ents.collect(&:name).collect(&:value)).
+            expect(ents.collect(&SG::Fun.digger(:name, :value))).
               to eql(entries)
             expect(ents.collect(&:offset)).
               to eql(ents.size.times.collect { _1 + 1 }) # todo why +1?
@@ -100,7 +99,7 @@ shared_examples_for 'Treaddir on a directory' do
           end
           it 'replies with entries from an offset' do
             ents = io.readdir(10, 1).wait.entries
-            expect(ents.collect(&:name).collect(&:value)).
+            expect(ents.collect(&SG::Fun.digger(:name, :value))).
               to eql(entries[1, 10] || [])
             expect(ents.collect(&:offset)).
               to eql(ents.size.times.collect { _1 + 2 })
@@ -140,13 +139,18 @@ shared_examples_for 'server allowing Treaddir' do
     end
 
     describe 'the attachment' do
-      it_should_behave_like 'Treaddir on a directory', at: nil, entries: entries.fetch(:root)
-      it_should_behave_like 'Treaddir on a directory', at: '', entries: entries.fetch(:root)
-      it_should_behave_like 'Treaddir on a directory', at: '/', entries: entries.fetch(:root)
+      it_should_behave_like('Treaddir on a directory',
+                            at: nil, entries: entries.fetch(:root))
+      it_should_behave_like('Treaddir on a directory',
+                            at: '', entries: entries.fetch(:root))
+      it_should_behave_like('Treaddir on a directory',
+                            at: '/', entries: entries.fetch(:root))
     end
     
     describe 'walking to a directory' do
-      it_should_behave_like 'Treaddir on a directory', at: paths.fetch(:rwdir), entries: entries.fetch(:rwdir)
+      it_should_behave_like('Treaddir on a directory',
+                            at: paths.fetch(:rwdir),
+                            entries: entries.fetch(:rwdir))
     end
 
     describe 'on a file' do
