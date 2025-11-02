@@ -26,8 +26,19 @@ module NonoP
   end
 
   def self.maybe_call(proc, ret, *args, **opts, &blk)
-    proc ? proc.call(ret, *args, **opts, &blk) :
-      (args.empty?? ret : [ ret, *args ])
+    if Proc === proc
+      proc.call(ret, *args, **opts, &blk)
+    elsif !opts.empty?
+      if ret == nil && args.empty?
+        opts
+      else
+        [ ret, *args, opts ]
+      end
+    elsif !args.empty?
+      [ ret, *args ]
+    else
+      ret
+    end
   end
 
   class ComparableNil

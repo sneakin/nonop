@@ -12,7 +12,7 @@ module NonoP
     READ_SIZE = 4096
 
     attr_reader :path, :attachment, :flags, :fid
-    predicate :ready
+    predicate :ready, :erred
 
     def initialize path, attachment:, flags: nil, fid: nil, &blk
       @path = RemotePath.new(path)
@@ -24,8 +24,14 @@ module NonoP
     end
 
     def wait
-      @reqs.wait # todo errors? no block...
-      self
+      return self if ready? || erred?
+      open if !ready? && @reqs.empty?
+
+      case r = @reqs.wait.tap { NonoP.vputs("Last req #{_1.inspect}") }
+        # todo errors? no block...
+      when ErrorPayload then raise OpenError.new(r)
+      else self
+      end
     end
 
     def client
@@ -37,6 +43,7 @@ module NonoP
     end
 
     def close
+      return self if !ready? || erred?
       client.clunk(fid) do |reply|
         raise reply if StandardError === reply
         @fid = nil
@@ -84,12 +91,10 @@ module NonoP
     end
 
     def getattr entry, &blk
-      wait unless ready?
       attachment.getattr(entry, fid: fid, &blk)
     end
 
     def stat entry, &blk
-      wait unless ready?
       attachment.stat(entry, &blk)
     end
 
@@ -101,16 +106,22 @@ module NonoP
         when Rwalk then
           @reqs << request(NonoP::L2000::Topen.new(fid: @fid, flags: @flags)) do |pkt|
             if ErrorPayload === pkt
-              NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, OpenError))
+              erred!
+              NonoP.maybe_call(blk, pkt)
             else
               client.track_fid(@fid) { self.close }
               ready!
               NonoP.maybe_call(blk, self)
             end
           end
-        else raise TypeError.new(pkt.class)
+        when Exception, ErrorPayload then
+          erred!
+          NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, OpenError))
+        else erred!; raise TypeError.new(pkt.class)
         end
       end
+
+      self
     end
 
     private
@@ -124,13 +135,13 @@ module NonoP
           else
             NonoP.maybe_call(blk, pkt)
           end
-        else raise TypeError.new(pkt.class)
+        else erred!; raise TypeError.new(pkt.class)
         end
       end
     end
 
     def request(...)
-      wait unless ready?
+      wait
       client.request(...)
     end
   end

@@ -53,7 +53,7 @@ class LsCommand < NonoP::Command::Client
             cc.call(false) do
               close
             end
-          end
+          end.wait
         end
       end
     end
@@ -63,7 +63,7 @@ class LsCommand < NonoP::Command::Client
   def ls_dir attachment, path, max_name: 0, &blk
     attachment.opendir(path) do |dir|
       puts("%s:" % [ path.empty?? '/' : path.to_s ])
-      if RuntimeError === dir
+      if RuntimeError === dir || NonoP::ErrorPayload === dir
         $stderr.puts("%s - %s" % [ path, dir ])
         @errors = true
         next blk.call
