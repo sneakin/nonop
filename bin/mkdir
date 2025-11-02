@@ -1,4 +1,4 @@
-#!/usr/bin/env -S bundle exec ruby
+#!/usr/bin/env -S ruby
 # -*- mode: ruby -*-
 
 require 'sg/ext'
