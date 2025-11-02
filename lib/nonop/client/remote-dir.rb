@@ -12,13 +12,20 @@ module NonoP
     READ_SIZE = 4096
 
     attr_reader :path, :attachment, :flags, :fid
+    predicate :ready
 
     def initialize path, attachment:, flags: nil, fid: nil, &blk
       @path = RemotePath.new(path)
       @attachment = attachment
       @flags = NonoP::OpenFlags.new(flags || :DIRECTORY)
       @fid = fid || client.next_fid
-      open_self(&blk).wait # todo ready like RemoteFile
+      @reqs = Client::PendingRequests.new(client).after(&:last)
+      open(&blk)
+    end
+
+    def wait
+      @reqs.wait # todo errors? no block...
+      self
     end
 
     def client
@@ -29,16 +36,12 @@ module NonoP
       attachment.fid
     end
 
-    def ready?
-      @ready
-    end
-
     def close
       client.clunk(fid) do |reply|
         raise reply if StandardError === reply
         @fid = nil
       end
-      @ready = false
+      unready!
       self
     end
 
@@ -63,33 +66,57 @@ module NonoP
     end
 
     def readdir count = nil, offset = nil, &blk
-      client.request(NonoP::L2000::Treaddir.new(fid: fid,
-                                                offset: offset || 0,
-                                                count: count || READ_SIZE)) do |result|
+      request(NonoP::L2000::Treaddir.new(fid: fid,
+                                         offset: offset || 0,
+                                         count: count || READ_SIZE)) do |result|
         NonoP.maybe_call(blk, NonoP.maybe_wrap_error(result, ReadError))
       end
     end
 
     def mkdir path, mode: nil, gid: nil, &blk
-      client.request(NonoP::L2000::Tmkdir.
-                     new(dfid: fid,
-                         name: NString.new(path.to_str),
-                         mode: mode || 0755,
-                         gid: gid || Process.gid)) do |pkt|
+      request(NonoP::L2000::Tmkdir.
+              new(dfid: fid,
+                  name: NString.new(path.to_str),
+                  mode: mode || 0755,
+                  gid: gid || Process.gid)) do |pkt|
         NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, MkdirError))
       end
     end
 
     def getattr entry, &blk
+      wait unless ready?
       attachment.getattr(entry, fid: fid, &blk)
     end
 
     def stat entry, &blk
+      wait unless ready?
       attachment.stat(entry, &blk)
     end
 
+    def open &blk
+      return NonoP.maybe_call(blk, self) if ready?
+
+      walk_to_self do |pkt|
+        case pkt
+        when Rwalk then
+          @reqs << request(NonoP::L2000::Topen.new(fid: @fid, flags: @flags)) do |pkt|
+            if ErrorPayload === pkt
+              NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, OpenError))
+            else
+              client.track_fid(@fid) { self.close }
+              ready!
+              NonoP.maybe_call(blk, self)
+            end
+          end
+        else raise TypeError.new(pkt.class)
+        end
+      end
+    end
+
+    private
+    
     def walk_to_self &blk
-      attachment.walk(@path, nfid: @fid) do |pkt|
+      @reqs << attachment.walk(@path, nfid: @fid) do |pkt|
         case pkt
         when Rwalk then
           if pkt.nwqid < @path.size
@@ -102,24 +129,9 @@ module NonoP
       end
     end
 
-    def open_self &blk
-      return NonoP.maybe_call(blk, self) if ready?
-
-      walk_to_self do |pkt|
-        case pkt
-        when Rwalk then
-          client.request(NonoP::L2000::Topen.new(fid: @fid, flags: @flags)) do |pkt|
-            if ErrorPayload === pkt
-              NonoP.maybe_call(blk, NonoP.maybe_wrap_error(pkt, OpenError))
-            else
-              client.track_fid(@fid) { self.close }
-              @ready = true
-              NonoP.maybe_call(blk, self)
-            end
-          end
-        else raise TypeError.new(pkt.class)
-        end
-      end
+    def request(...)
+      wait unless ready?
+      client.request(...)
     end
   end
 end
