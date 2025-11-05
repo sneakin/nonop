@@ -170,6 +170,7 @@ end
   Signal.trap(sig) { reactor.done! }
 end
 
+Process.warmup
 reactor.serve! timeout: reactor_timeout
 
 puts("Goodbye.")
