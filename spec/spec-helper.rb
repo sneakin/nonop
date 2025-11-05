@@ -19,12 +19,14 @@ module NonoP::SpecHelper
   end
 
   def start_server *args
+    unless args.find(&/-e|--export/)
+      args += [ '--export', 'spec:spec/spec-fs.nonofs',
+                '--export', 'basic:examples/basic-fs.rb' ]
+    end
     pid = Process.spawn('bundle', 'exec', NONOP_PATH, 'server',
                         '--port', PORT.to_s,
                         '--auth-provider', 'yes',
                         '--acl', 'spec/spec-acl.rb',
-                        '--export', 'spec:spec/spec-fs.nonofs',
-                        '--export', 'basic:examples/basic-fs.rb',
                         *args)
     now = Time.at(Time.now.to_i + 1).strftime("%x %X")
     sleep(2) # fixme need a ready signal of sorts
