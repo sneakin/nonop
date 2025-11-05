@@ -4,7 +4,7 @@ using SG::Ext
 require_relative '../helper'
 
 shared_examples_for 'server allowing Tstatfs' do
-  |state:, stats:|
+  |state:, stats:, ctl_stats:|
 
   include ClientHelper
 
@@ -70,6 +70,39 @@ shared_examples_for 'server allowing Tstatfs' do
           each { expect(r.send(_1)).to eql(_2) }
       end
 
+      describe 'other exports' do
+        let(:ctl) do
+          client.attach(afid: -1,
+                        uname: state.username,
+                        aname: 'ctl',
+                        n_uname: state.uid).wait
+        end
+
+        describe 'before reauth' do
+          it 'errors' do
+            expect { ctl.statfs.wait }.to raise_error(NonoP::AttachError)
+          end
+        end
+
+        describe 'after reauth' do
+          before do
+            # todo use new afid for attach?
+            client.auth(uname: state.username,
+                        aname: 'ctl',
+                        n_uname: state.uid,
+                        credentials: state.creds)
+          end
+
+          it 'returns a response' do
+            expect(ctl.statfs).to be_kind_of(NonoP::Client::PendingRequest)
+          end
+
+          it 'gets info about the export' do
+            expect(r = ctl.statfs.wait).to be_kind_of(NonoP::L2000::Rstatfs)
+          end
+        end
+      end
+      
       describe 'other fids' do
         it 'errors with bad fd' do
           att = NonoP::Attachment.new(client: client,

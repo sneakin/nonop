@@ -71,7 +71,8 @@ describe 'server exporting a RW PathEntry' do
     w.it_should_behave_like 'server allowing Tread', paths: Paths
     w.it_should_behave_like 'server allowing Twrite', paths: Paths
     w.it_should_behave_like('server allowing Tstatfs',
-                            stats: File.statfs(Paths.fetch(:rw)[0]))
+                            stats: File.statfs(Paths.fetch(:rw)[0]),
+                            ctl_stats: {})
     w.it_should_behave_like('server allowing Treaddir',
                             paths: Paths,
                             entries: {

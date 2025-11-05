@@ -43,7 +43,9 @@ describe 'server exporting a RW DirectoryEntry via a HashFileSystem' do
     w.it_should_behave_like('server allowing Tlopen', paths: paths)
     w.it_should_behave_like 'server allowing Tread', paths: paths
     w.it_should_behave_like 'server allowing Twrite', paths: paths
-    w.it_should_behave_like 'server allowing Tstatfs', stats: { type: 0x01021997, bsize: 4096, namelen: 255 }
+    w.it_should_behave_like('server allowing Tstatfs',
+                            stats: { type: 0x01021997, bsize: 4096, namelen: 255 },
+                            ctl_stats: { type: 0x01021997, bsize: 4096, namelen: 255 })
 
     w.it_should_behave_like('server allowing Treaddir',
                             paths: paths,
