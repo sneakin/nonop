@@ -11,6 +11,7 @@ shared_examples_for 'Tlopen with good flags' do
       expect(rio = attachment.open(at, flags: flags).wait).
         to be_kind_of(NonoP::RemoteFile)
       expect(rio).to be_ready
+      expect((0..client.max_datalen).include?(rio.iounit)).to be_truthy
     end
   end
 end

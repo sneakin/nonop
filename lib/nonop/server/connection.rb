@@ -279,7 +279,7 @@ module NonoP::Server
       begin
         stream.open(NonoP::OpenFlags.new(pkt.data.flags))
         reply_to(pkt, NonoP::Ropen.new(qid: stream.qid || stream.fs.qid,
-                                       iounit: 0))
+                                       iounit: coder.max_datalen))
       rescue KeyError
         reply_to(pkt, NonoP::L2000::Rerror.new(Errno::EBADFD))
       rescue SystemCallError

@@ -9,7 +9,7 @@ require_relative '../open-flags'
 
 module NonoP
   class RemoteFile
-    attr_reader :attachment, :path, :flags, :io
+    attr_reader :attachment, :path, :flags, :io, :iounit
     predicate :ready
 
     def initialize path, attachment:, fid: nil, flags: nil
@@ -52,6 +52,7 @@ module NonoP
               if ErrorPayload === pkt
                 NonoP.maybe_call(blk, OpenError.new(pkt))
               else
+                @iounit = pkt.iounit
                 ready!
                 NonoP.maybe_call(blk, self)
               end
@@ -87,6 +88,7 @@ module NonoP
                                        gid: gid || 0)) do |pkt|
               case pkt
               when Rcreate
+                @iounit = pkt.iounit
                 ready!
                 NonoP.maybe_call(blk, self)
               when ErrorPayload then NonoP.maybe_call(blk, CreateError.new(pkt, path))
