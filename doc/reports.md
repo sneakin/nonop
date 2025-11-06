@@ -2,6 +2,8 @@
 
 ## Test Status
 
+`spec/**/*.spec`
+
 |      File       |      100%       |     Passed      |     Pending     |
 |-----------------|-----------------|-----------------|-----------------|
 | cat.spec        | false           |  89% (8/9)      |  11% (1/9)      |
@@ -17,7 +19,12 @@
 
 ## Protocol Coverage
 
+Overview of how perfect the protocol requests are.
+
 ### Client API
+
+Driver
+: `spec/integration/client`
 
 |      File       |      100%       |     Passed      |     Pending     |
 |-----------------|-----------------|-----------------|-----------------|
@@ -50,6 +57,9 @@
 
 ### Manual requests
 
+Driver
+: `spec/integration/requests`
+
 |      File       |      100%       |     Passed      |     Pending     |
 |-----------------|-----------------|-----------------|-----------------|
 | Tattach         | false           |  71% (15/21)    |                 |
@@ -70,7 +80,7 @@
 | Trename         | false           |                 | 100% (3/3)      |
 | Tsetattr        | false           |                 | 100% (3/3)      |
 | Tstat           | false           |                 |                 |
-| Tstatfs         | false           |  89% (16/18)    |                 |
+| Tstatfs         | true            | 100% (18/18)    |                 |
 | Tsymlink        | false           |                 | 100% (3/3)      |
 | Tversion        | false           |  51% (18/35)    |                 |
 | Twalk           | false           |  91% (30/33)    |   9% (3/33)     |
