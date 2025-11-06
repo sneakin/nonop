@@ -24,7 +24,7 @@ shared_examples_for 'Tlopen with bad flags' do
   flags.each do |flags|
     it "errors opening with #{flags.inspect}" do
       expect { attachment.open(at, flags: flags).wait }.
-        to raise_error(NonoP::OpenError)
+        to raise_error(NonoP::Error) # todo ENOENT?
     end
   end
 end

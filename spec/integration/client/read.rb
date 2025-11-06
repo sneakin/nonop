@@ -69,14 +69,14 @@ end
 shared_examples_for 'Tread on a write only file' do
   |at:, state:|
   describe "walking to #{at.inspect}" do
-    let(:io) { attachment.open(at, flags: :WRONLY) }
+    let(:io) { attachment.open(at, flags: [ :WRONLY ]) }
 
     before do
       io.wait
     end
     
     it 'errors' do
-      expect { io.read(32) }.to raise_error(ArgumentError)
+      expect { io.read(32) }.to raise_error(NonoP::ReadError)
     end      
   end
 end

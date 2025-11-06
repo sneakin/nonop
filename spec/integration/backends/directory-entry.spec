@@ -117,14 +117,23 @@ describe 'server exporting a RO DirectoryEntry via a HashFileSystem' do
     w.it_should_behave_like 'server allowing Twalk'
     w.it_should_behave_like 'server allowing Tlopen', paths: paths
     w.it_should_behave_like 'server allowing Tread', paths: paths
+    w.it_should_behave_like 'server allowing Twrite', paths: paths
+    w.it_should_behave_like('server allowing Tstatfs',
+                            stats: { type: 0x01021997, bsize: 4096, namelen: 255 },
+                            ctl_stats: { type: 0x01021997, bsize: 4096, namelen: 255 })
+
+    w.it_should_behave_like('server allowing Treaddir',
+                            paths: paths,
+                            entries: {
+                              rwdir: [],
+                              root: %w{ welcome scratch fifo tmp src README.md info }
+                            })
 
     if SPEC_DRIVER != 'client'
       w.it_should_behave_like 'server allowing Topen'
       w.it_should_behave_like 'server refusing Tlcreate'
-      w.it_should_behave_like 'server refusing Twrite'
       w.it_should_behave_like 'server allowing Tflush'
       w.it_should_behave_like 'server allowing Tfsync'
-      w.it_should_behave_like 'server allowing Tstatfs'
       w.it_should_behave_like 'server allowing Tgetattr'
       w.it_should_behave_like 'server refusing Tsetattr'
       w.it_should_behave_like 'server allowing Tlock'
@@ -137,7 +146,6 @@ describe 'server exporting a RO DirectoryEntry via a HashFileSystem' do
       w.it_should_behave_like 'server refusing Tsymlink'
       w.it_should_behave_like 'server allowing Treadlink'
       w.it_should_behave_like 'server refusing Tmkdir'
-      w.it_should_behave_like 'server allowing Treaddir'
       w.it_should_behave_like 'server refusing Tmknod'
       w.it_should_behave_like 'server refusing Txattrcreate'
       w.it_should_behave_like 'server allowing Txattrwalk'
