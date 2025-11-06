@@ -12,6 +12,8 @@ NonoP provides a server and client commands and API tobise the 9p2000 file shari
 
 Attention
 : This is still more a proof of concept. Writing, xattr, locks, and features beyond basic reading likely won't work or at worst appear to work but drop bytes. There's enough support for a mostly read-only file system that can be mounted by Linux and Diod's 9p drivers.
+:
+: See [doc/reports.org](file.reports.html)
 
 # Installation
 
@@ -89,6 +91,14 @@ Common options include:
 : Bypasses all authentication.
 
 ## API
+
+### Client
+
+{NonoP::Client}
+: The client API.
+
+[spec/integration/client]()
+: Test suite of all the client can do.
 
 ### Hash Defined
 

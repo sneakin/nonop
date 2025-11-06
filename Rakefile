@@ -5,6 +5,7 @@ $NAME = 'NonoP'
 $VERSION = '0.1.0'
 $SOURCE_FILES = []
 $EXTRA_FILES = [ 'doc/protocol.md',
+                 'doc/reports.org',
                  'examples/**/*.{rb,nonofs}',
                  'spec/spec-fs.nonofs',
                  'scripts/protocol-scanner']

@@ -15,7 +15,7 @@ ProtoOps = [ 'Tlopen' ] +
 
 examples = examples.group_by do |ex|
   ProtoOps.find do |op|
-    ex['full_description'] =~ /#{op}/
+    ex['full_description'] =~ /#{op}(\s|\z)/m
   end || 'unknown'
 end
 
