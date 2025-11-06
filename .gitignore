@@ -5,5 +5,11 @@
 ETAGS
 TAGS
 doc/api
+doc/yard
+doc/rdoc
+doc/coverage
+doc/api
+doc/spec*.html
+doc/spec*.json
 .bundle
 .gems
