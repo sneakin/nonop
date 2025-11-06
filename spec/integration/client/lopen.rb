@@ -3,6 +3,8 @@ using SG::Ext
 
 require_relative '../helper'
 
+# todo iounit is the default read block size the server supports for a file
+
 shared_examples_for 'Tlopen with good flags' do
   |at:, flags:|
 

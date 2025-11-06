@@ -126,6 +126,10 @@ shared_examples_for 'Tread on a directory' do
       expect { io.read(32) }.to raise_error(NonoP::ReadError)
     end
   end
+  
+  describe '9p2000' do
+    it 'uses Tread to read directories as files of Rstat dirents'
+  end
 end
 
 shared_examples_for 'server allowing Tread' do

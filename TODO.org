@@ -1,4 +1,10 @@
 * Features
+** Protocol versions
+*** 9p2000
+Open can create files and directories.
+Read can read dirents from directories.
+*** 9p2000.U
+*** 9p2000.L
 ** Client errors: reuse or mirror Errno
 ** Review Tautch and Tattach w/ afid = -1 and not; and caching of auth results
 ** Namespacing
@@ -67,89 +73,243 @@
 **** 1-to-Mn
 ** In the source
 #+NAME todos
-#+BEGIN_SRC sh :results output org
-~/Projects/scripts/projects/todo.sh bin lib spec
+#+BEGIN_SRC sh :results output raw
+~/Projects/scripts/projects/todo.sh bin lib spec | awk '// { printf("*** %s\n", $0) }'
 #+END_SRC
 
 #+RESULTS:
-#+begin_src org
-TODO test this rescue [[file:bin/put::96]]
-TODO files with colons? [[file:bin/cat::40]]
-TODO move into RemoteFile? [[file:bin/cat::53]]
-TODO where is it handled? [[file:bin/cat::59]]
-FIXME file systems need an fsid [[file:lib/nonop/server/streams/attach-stream.rb::36]]
-TODO cache in the DataProvider? [[file:lib/nonop/server/file-system/directory-entry.rb::118]]
-TODO full mapping [[file:lib/nonop/server/file-system/path-entry.rb::40]]
-lib/nonop/server/file-system/path-entry.rb:65:        # FIXME
-FIXME deadlock on pipes, the open may be the blocker [[file:lib/nonop/server/file-system/path-entry.rb::87]]
-FIXME unable to seek fifos [[file:lib/nonop/server/file-system/path-entry.rb::88]]
-TODO What happens if the io blocks? Ideally a reply finally gets sent when data is read w/o blocking any thing else. [[file:lib/nonop/server/file-system/path-entry.rb::137]]
-TODO Purely IO backed entries: open & close pose problems [[file:lib/nonop/server/file-system/path-entry.rb::138]]
-TODO client module [[file:lib/nonop/client/attachment.rb::7]]
-FIXME using afid != -1 errors; stream.authenticated? fails w/ creds cleared; Tattchbalvays needs a Tauth to create an afid? [[file:lib/nonop/server/connection.rb::136]]
-TODO the afid should tie the user to the export via fid [[file:lib/nonop/server/connection.rb::139]]
-TODO get export via the stream? [[file:lib/nonop/server/connection.rb::160]]
-TODO refuse anon access? [[file:lib/nonop/server/connection.rb::184]]
-TODO manual also says afid ~0 means no auth [[file:lib/nonop/server/connection.rb::187]]
-TODO async reply [[file:lib/nonop/server/connection.rb::216]]
-TODO async reply [[file:lib/nonop/server/connection.rb::230]]
-FIXME not catching [[file:lib/nonop/server/connection.rb::236]]
-TODO File stat structure insteadbof open hashes [[file:lib/nonop/server/file-system/base.rb::121]]
-FIXME deadlocks the show, when #wait needs a Fiber scheduler [[file:lib/nonop/thread-pool.rb::316]]
-TODO start tasks in parallel w/ dead lock [[file:lib/nonop/thread-pool.rb::329]]
-TODO zip the factorings and twins [[file:lib/nonop/thread-pool.rb::333]]
-TODO test creating in directories that do not exist [[file:lib/nonop/client/remote-file.rb::78]]
-TODO length limited to msglen [[file:lib/nonop/client/remote-file.rb::109]]
-TODO handling multiple replies for big reads [[file:lib/nonop/client/remote-file.rb::110]]
-TODO call this? default calls back. [[file:lib/nonop/client.rb::215]]
-TODO get from @authenticated [[file:lib/nonop/client.rb::231]]
-TODO length limited to msglen [[file:lib/nonop/client/remote-io.rb::34]]
-TODO handling multiple replies for big reads [[file:lib/nonop/client/remote-io.rb::35]]
-TODO yield the offset too? [[file:lib/nonop/client/remote-io.rb::74]]
-TODO any real need for Packet? Which of these is faster? [[file:lib/nonop/decoder.rb::116]]
-TODO off by 1? [[file:lib/nonop/decoder.rb::129]]
-TODO bytesize? [[file:lib/nonop/server/file-system/buffer-entry.rb::79]]
-TODO be picky [[file:lib/nonop/server/file-system/buffer-entry.rb::92]]
-TODO auth provider [[file:lib/nonop/command.rb::100]]
-TODO an async version to complement an enumerable; needs to pass a continuation to ~blk~ [[file:lib/nonop/client/remote-dir.rb::44]]
-TODO be picky [[file:lib/nonop/server/file-system/fifo-entry.rb::105]]
-TODO bitfield [[file:lib/nonop/qid.rb::11]]
-TODO get users from system [[file:lib/nonop/server/auth.rb::87]]
-TODO part of the base 9p? [[file:lib/nonop/messages/2000L/readdir.rb::8]]
-TODO 9p2000.u packet [[file:lib/nonop/messages/create.rb::8]]
-TODO better [[file:spec/integration/client/statfs.rb::51]]
-TODO better [[file:spec/integration/client/statfs.rb::86]]
-FIXME testing DirectoryEntry more so w/ the spec-fs; PathEntry hits real files. Paths tomfdles need to be specified; test dir setup [[file:spec/integration/backends/path-entry.spec::38]]
-TODO Rerror until Tversion [[file:spec/integration/client/clunk.rb::18]]
-TODO exercise other afids [[file:spec/integration/client/clunk.rb::65]]
-spec/integration/client/write.rb:146:        it 'can be read back' do # FIXME
-TODO hov to fill the fifo w/ backend independence? [[file:spec/integration/client/read.rb::156]]
-TODO File.open like block w/ close [[file:spec/integration/helper.rb::38]]
-TODO use paths [[file:spec/integration/requests/walk.rb::9]]
-TODO Rerror until Tversion [[file:spec/integration/requests/walk.rb::23]]
-FIXME use afid too [[file:spec/integration/requests/walk.rb::83]]
-TODO need ACL and to use a user w/o access [[file:spec/integration/requests/walk.rb::186]]
-TODO Rerror until Tversion [[file:spec/integration/client/walk.rb::23]]
-FIXME use afid too [[file:spec/integration/client/walk.rb::83]]
-TODO need ACL and to use a user w/o access [[file:spec/integration/client/walk.rb::181]]
-TODO UID & GID checks [[file:spec/integration/requests/lopen.rb::199]]
-TODO UID & GID checks [[file:spec/integration/client/lopen.rb::161]]
-TODO uses L2000::Tattach [[file:spec/integration/client/attach.rb::6]]
-FIXME create actual ACL for the test [[file:spec/integration/client/attach.rb::89]]
-TODO server does not yet handle Tauth [[file:spec/integration/requests/auth.rb::6]]
-FIXME Server needs to delay user lookup errors until attach [[file:spec/integration/client/lauth.rb::6]]
-TODO Client only uses Tlauth and this is duplicated in auth.rb.; could and should test a non-9p2000.L auth. [[file:spec/integration/client/lauth.rb::7]]
-TODO uses L2000::Tattach [[file:spec/integration/requests/attach.rb::6]]
-FIXME create actual ACL for the test [[file:spec/integration/requests/attach.rb::92]]
-TODO Rerror until Tversion [[file:spec/integration/requests/clunk.rb::18]]
-TODO exercise other afids [[file:spec/integration/requests/clunk.rb::65]]
-FIXME Server needs to delay user lookup errors until attach [[file:spec/integration/requests/lauth.rb::6]]
-TODO Attachment#initialize needs to wait [[file:spec/integration/requests/lauth.rb::32]]
-TODO multiple small writes...a reason why to delay for action on attach [[file:spec/integration/requests/lauth.rb::81]]
-TODO match client? or server? [[file:spec/integration/requests/version.rb::20]]
-FIXME need a ready signal of sorts [[file:spec/spec-helper.rb::30]]
-TODO shared secret auth instead of munge [[file:spec/commands/server.spec::9]]
-FIXME stop using the Yes backend to test bad users; only [[file:spec/commands/server.spec::51]]
-TODO uid=~0 [[file:spec/commands/server.spec::95]]
-78
-#+end_src
+*** TODO files with colons? [[file:bin/cat::40]]
+*** TODO move into RemoteFile? [[file:bin/cat::53]]
+*** TODO where is it handled? [[file:bin/cat::59]]
+*** TODO test this rescue [[file:bin/put::96]]
+*** TODO bytesize? [[file:lib/nonop/server/file-system/buffer-entry.rb::79]]
+*** TODO be picky [[file:lib/nonop/server/file-system/buffer-entry.rb::92]]
+*** TODO test creating in directories that do not exist [[file:lib/nonop/client/remote-file.rb::79]]
+*** TODO length limited to msglen [[file:lib/nonop/client/remote-file.rb::111]]
+*** TODO handling multiple replies for big reads [[file:lib/nonop/client/remote-file.rb::112]]
+*** FIXME using afid != -1 errors; stream.authenticated? fails w/ creds cleared; Tattchbalvays needs a Tauth to create an afid? [[file:lib/nonop/server/connection.rb::136]]
+*** TODO the afid should tie the user to the export via fid [[file:lib/nonop/server/connection.rb::139]]
+*** TODO get export via the stream? [[file:lib/nonop/server/connection.rb::160]]
+*** TODO refuse anon access? [[file:lib/nonop/server/connection.rb::184]]
+*** TODO manual also says afid ~0 means no auth [[file:lib/nonop/server/connection.rb::187]]
+*** TODO async reply [[file:lib/nonop/server/connection.rb::216]]
+*** TODO async reply [[file:lib/nonop/server/connection.rb::230]]
+*** FIXME not catching [[file:lib/nonop/server/connection.rb::236]]
+*** TODO why? [[file:lib/nonop/server/connection.rb::338]]
+*** FIXME deadlocks the show, when #wait needs a Fiber scheduler [[file:lib/nonop/thread-pool.rb::352]]
+*** TODO start tasks in parallel w/ dead lock [[file:lib/nonop/thread-pool.rb::365]]
+*** TODO zip the factorings and twins [[file:lib/nonop/thread-pool.rb::369]]
+*** TODO errors? no block... [[file:lib/nonop/client/remote-dir.rb::31]]
+*** TODO an async version to complement an enumerable; needs to pass a continuation to ~blk~ [[file:lib/nonop/client/remote-dir.rb::55]]
+*** TODO full mapping [[file:lib/nonop/server/file-system/path-entry.rb::40]]
+*** lib/nonop/server/file-system/path-entry.rb:65:        # FIXME
+*** FIXME deadlock on pipes, the open may be the blocker [[file:lib/nonop/server/file-system/path-entry.rb::87]]
+*** FIXME unable to seek fifos [[file:lib/nonop/server/file-system/path-entry.rb::88]]
+*** TODO What happens if the io blocks? Ideally a reply finally gets sent when data is read w/o blocking any thing else. [[file:lib/nonop/server/file-system/path-entry.rb::137]]
+*** TODO Purely IO backed entries: open & close pose problems [[file:lib/nonop/server/file-system/path-entry.rb::138]]
+*** TODO cache in the data provider so the fsid sees a consistent list [[file:lib/nonop/server/file-system/path-entry.rb::225]]
+*** TODO part of the base 9p? [[file:lib/nonop/messages/2000L/readdir.rb::8]]
+*** TODO client module [[file:lib/nonop/client/attachment.rb::7]]
+*** FIXME file systems need an fsid [[file:lib/nonop/server/streams/attach-stream.rb::36]]
+*** TODO cache in the DataProvider? [[file:lib/nonop/server/file-system/directory-entry.rb::118]]
+*** TODO File stat structure insteadbof open hashes [[file:lib/nonop/server/file-system/base.rb::121]]
+*** TODO call this? default calls back. [[file:lib/nonop/client.rb::215]]
+*** TODO get from @authenticated [[file:lib/nonop/client.rb::231]]
+*** TODO length limited to msglen [[file:lib/nonop/client/remote-io.rb::34]]
+*** TODO handling multiple replies for big reads [[file:lib/nonop/client/remote-io.rb::35]]
+*** TODO yield the offset too? [[file:lib/nonop/client/remote-io.rb::74]]
+*** TODO any real need for Packet? Which of these is faster? [[file:lib/nonop/decoder.rb::116]]
+*** TODO off by 1? [[file:lib/nonop/decoder.rb::129]]
+*** TODO auth provider [[file:lib/nonop/command.rb::100]]
+*** TODO be picky [[file:lib/nonop/server/file-system/fifo-entry.rb::105]]
+*** TODO bitfield [[file:lib/nonop/qid.rb::11]]
+*** TODO get users from system [[file:lib/nonop/server/auth.rb::87]]
+*** TODO 9p2000.u packet [[file:lib/nonop/messages/create.rb::8]]
+*** TODO iounit is the default read block size the server supports for a file [[file:spec/integration/client/lopen.rb::6]]
+*** TODO ENOENT? [[file:spec/integration/client/lopen.rb::27]]
+*** TODO UID & GID checks [[file:spec/integration/client/lopen.rb::164]]
+*** TODO hov to fill the fifo w/ backend independence? [[file:spec/integration/client/read.rb::160]]
+*** FIXME need a ready signal of sorts [[file:spec/spec-helper.rb::32]]
+*** FIXME testing DirectoryEntry more so w/ the spec-fs; PathEntry hits real files. Paths to files need to be specified; test dir setup [[file:spec/integration/backends/path-entry.spec::38]]
+*** TODO better [[file:spec/integration/client/statfs.rb::49]]
+*** TODO use new afid for attach? [[file:spec/integration/client/statfs.rb::89]]
+*** TODO better [[file:spec/integration/client/statfs.rb::117]]
+*** TODO wide and deep directories [[file:spec/integration/client/readdir.rb::7]]
+*** TODO umode and ACL cases [[file:spec/integration/client/readdir.rb::8]]
+*** TODO why +1? [[file:spec/integration/client/readdir.rb::93]]
+*** TODO Rerror until Tversion [[file:spec/integration/client/clunk.rb::18]]
+*** TODO exercise other afids [[file:spec/integration/client/clunk.rb::65]]
+*** spec/integration/client/write.rb:146:        it 'can be read back' do # FIXME
+*** TODO File.open like block w/ close [[file:spec/integration/helper.rb::38]]
+*** TODO use paths [[file:spec/integration/requests/walk.rb::9]]
+*** TODO Rerror until Tversion [[file:spec/integration/requests/walk.rb::23]]
+*** FIXME use afid too [[file:spec/integration/requests/walk.rb::83]]
+*** TODO need ACL and to use a user w/o access [[file:spec/integration/requests/walk.rb::186]]
+*** TODO Rerror until Tversion [[file:spec/integration/client/walk.rb::23]]
+*** FIXME use afid too [[file:spec/integration/client/walk.rb::83]]
+*** TODO need ACL and to use a user w/o access [[file:spec/integration/client/walk.rb::181]]
+*** TODO UID & GID checks [[file:spec/integration/requests/lopen.rb::199]]
+*** TODO uses L2000::Tattach [[file:spec/integration/client/attach.rb::6]]
+*** FIXME create actual ACL for the test [[file:spec/integration/client/attach.rb::89]]
+*** TODO server does not yet handle Tauth [[file:spec/integration/requests/auth.rb::6]]
+*** FIXME Server needs to delay user lookup errors until attach [[file:spec/integration/client/lauth.rb::6]]
+*** TODO Client only uses Tlauth and this is duplicated in auth.rb.; could and should test a non-9p2000.L auth. [[file:spec/integration/client/lauth.rb::7]]
+*** TODO uses L2000::Tattach [[file:spec/integration/requests/attach.rb::6]]
+*** FIXME create actual ACL for the test [[file:spec/integration/requests/attach.rb::92]]
+*** TODO Rerror until Tversion [[file:spec/integration/requests/clunk.rb::18]]
+*** TODO exercise other afids [[file:spec/integration/requests/clunk.rb::65]]
+*** FIXME Server needs to delay user lookup errors until attach [[file:spec/integration/requests/lauth.rb::6]]
+*** TODO Attachment#initialize needs to wait [[file:spec/integration/requests/lauth.rb::32]]
+*** TODO multiple small writes...a reason why to delay for action on attach [[file:spec/integration/requests/lauth.rb::81]]
+*** TODO match client? or server? [[file:spec/integration/requests/version.rb::20]]
+*** TODO shared secret auth instead of munge [[file:spec/commands/server.spec::9]]
+*** FIXME stop using the Yes backend to test bad users; only [[file:spec/commands/server.spec::51]]
+*** TODO uid=~0 [[file:spec/commands/server.spec::95]]
+*** 87
+*** TODO files with colons? [[file:bin/cat::40]]
+*** TODO move into RemoteFile? [[file:bin/cat::53]]
+*** TODO where is it handled? [[file:bin/cat::59]]
+*** TODO test this rescue [[file:bin/put::96]]
+*** TODO bytesize? [[file:lib/nonop/server/file-system/buffer-entry.rb::79]]
+*** TODO be picky [[file:lib/nonop/server/file-system/buffer-entry.rb::92]]
+*** TODO test creating in directories that do not exist [[file:lib/nonop/client/remote-file.rb::79]]
+*** TODO length limited to msglen [[file:lib/nonop/client/remote-file.rb::111]]
+*** TODO handling multiple replies for big reads [[file:lib/nonop/client/remote-file.rb::112]]
+*** FIXME using afid != -1 errors; stream.authenticated? fails w/ creds cleared; Tattchbalvays needs a Tauth to create an afid? [[file:lib/nonop/server/connection.rb::136]]
+*** TODO the afid should tie the user to the export via fid [[file:lib/nonop/server/connection.rb::139]]
+*** TODO get export via the stream? [[file:lib/nonop/server/connection.rb::160]]
+*** TODO refuse anon access? [[file:lib/nonop/server/connection.rb::184]]
+*** TODO manual also says afid ~0 means no auth [[file:lib/nonop/server/connection.rb::187]]
+*** TODO async reply [[file:lib/nonop/server/connection.rb::216]]
+*** TODO async reply [[file:lib/nonop/server/connection.rb::230]]
+*** FIXME not catching [[file:lib/nonop/server/connection.rb::236]]
+*** TODO why? [[file:lib/nonop/server/connection.rb::338]]
+*** FIXME deadlocks the show, when #wait needs a Fiber scheduler [[file:lib/nonop/thread-pool.rb::352]]
+*** TODO start tasks in parallel w/ dead lock [[file:lib/nonop/thread-pool.rb::365]]
+*** TODO zip the factorings and twins [[file:lib/nonop/thread-pool.rb::369]]
+*** TODO errors? no block... [[file:lib/nonop/client/remote-dir.rb::31]]
+*** TODO an async version to complement an enumerable; needs to pass a continuation to ~blk~ [[file:lib/nonop/client/remote-dir.rb::55]]
+*** TODO full mapping [[file:lib/nonop/server/file-system/path-entry.rb::40]]
+*** lib/nonop/server/file-system/path-entry.rb:65:        # FIXME
+*** FIXME deadlock on pipes, the open may be the blocker [[file:lib/nonop/server/file-system/path-entry.rb::87]]
+*** FIXME unable to seek fifos [[file:lib/nonop/server/file-system/path-entry.rb::88]]
+*** TODO What happens if the io blocks? Ideally a reply finally gets sent when data is read w/o blocking any thing else. [[file:lib/nonop/server/file-system/path-entry.rb::137]]
+*** TODO Purely IO backed entries: open & close pose problems [[file:lib/nonop/server/file-system/path-entry.rb::138]]
+*** TODO cache in the data provider so the fsid sees a consistent list [[file:lib/nonop/server/file-system/path-entry.rb::225]]
+*** TODO part of the base 9p? [[file:lib/nonop/messages/2000L/readdir.rb::8]]
+*** TODO client module [[file:lib/nonop/client/attachment.rb::7]]
+*** FIXME file systems need an fsid [[file:lib/nonop/server/streams/attach-stream.rb::36]]
+*** TODO cache in the DataProvider? [[file:lib/nonop/server/file-system/directory-entry.rb::118]]
+*** TODO File stat structure insteadbof open hashes [[file:lib/nonop/server/file-system/base.rb::121]]
+*** TODO call this? default calls back. [[file:lib/nonop/client.rb::215]]
+*** TODO get from @authenticated [[file:lib/nonop/client.rb::231]]
+*** TODO length limited to msglen [[file:lib/nonop/client/remote-io.rb::34]]
+*** TODO handling multiple replies for big reads [[file:lib/nonop/client/remote-io.rb::35]]
+*** TODO yield the offset too? [[file:lib/nonop/client/remote-io.rb::74]]
+*** TODO any real need for Packet? Which of these is faster? [[file:lib/nonop/decoder.rb::116]]
+*** TODO off by 1? [[file:lib/nonop/decoder.rb::129]]
+*** TODO auth provider [[file:lib/nonop/command.rb::100]]
+*** TODO be picky [[file:lib/nonop/server/file-system/fifo-entry.rb::105]]
+*** TODO bitfield [[file:lib/nonop/qid.rb::11]]
+*** TODO get users from system [[file:lib/nonop/server/auth.rb::87]]
+*** TODO 9p2000.u packet [[file:lib/nonop/messages/create.rb::8]]
+*** TODO iounit is the default read block size the server supports for a file [[file:spec/integration/client/lopen.rb::6]]
+*** TODO ENOENT? [[file:spec/integration/client/lopen.rb::27]]
+*** TODO UID & GID checks [[file:spec/integration/client/lopen.rb::164]]
+*** TODO hov to fill the fifo w/ backend independence? [[file:spec/integration/client/read.rb::160]]
+*** FIXME need a ready signal of sorts [[file:spec/spec-helper.rb::32]]
+*** FIXME testing DirectoryEntry more so w/ the spec-fs; PathEntry hits real files. Paths to files need to be specified; test dir setup [[file:spec/integration/backends/path-entry.spec::38]]
+*** TODO better [[file:spec/integration/client/statfs.rb::49]]
+*** TODO use new afid for attach? [[file:spec/integration/client/statfs.rb::89]]
+*** TODO better [[file:spec/integration/client/statfs.rb::117]]
+*** TODO wide and deep directories [[file:spec/integration/client/readdir.rb::7]]
+*** TODO umode and ACL cases [[file:spec/integration/client/readdir.rb::8]]
+*** TODO why +1? [[file:spec/integration/client/readdir.rb::93]]
+*** TODO Rerror until Tversion [[file:spec/integration/client/clunk.rb::18]]
+*** TODO exercise other afids [[file:spec/integration/client/clunk.rb::65]]
+*** spec/integration/client/write.rb:146:        it 'can be read back' do # FIXME
+*** TODO File.open like block w/ close [[file:spec/integration/helper.rb::38]]
+*** TODO use paths [[file:spec/integration/requests/walk.rb::9]]
+*** TODO Rerror until Tversion [[file:spec/integration/requests/walk.rb::23]]
+*** FIXME use afid too [[file:spec/integration/requests/walk.rb::83]]
+*** TODO need ACL and to use a user w/o access [[file:spec/integration/requests/walk.rb::186]]
+*** TODO Rerror until Tversion [[file:spec/integration/client/walk.rb::23]]
+*** FIXME use afid too [[file:spec/integration/client/walk.rb::83]]
+*** TODO need ACL and to use a user w/o access [[file:spec/integration/client/walk.rb::181]]
+*** TODO UID & GID checks [[file:spec/integration/requests/lopen.rb::199]]
+*** TODO uses L2000::Tattach [[file:spec/integration/client/attach.rb::6]]
+*** FIXME create actual ACL for the test [[file:spec/integration/client/attach.rb::89]]
+*** TODO server does not yet handle Tauth [[file:spec/integration/requests/auth.rb::6]]
+*** FIXME Server needs to delay user lookup errors until attach [[file:spec/integration/client/lauth.rb::6]]
+*** TODO Client only uses Tlauth and this is duplicated in auth.rb.; could and should test a non-9p2000.L auth. [[file:spec/integration/client/lauth.rb::7]]
+*** TODO uses L2000::Tattach [[file:spec/integration/requests/attach.rb::6]]
+*** FIXME create actual ACL for the test [[file:spec/integration/requests/attach.rb::92]]
+*** TODO Rerror until Tversion [[file:spec/integration/requests/clunk.rb::18]]
+*** TODO exercise other afids [[file:spec/integration/requests/clunk.rb::65]]
+*** FIXME Server needs to delay user lookup errors until attach [[file:spec/integration/requests/lauth.rb::6]]
+*** TODO Attachment#initialize needs to wait [[file:spec/integration/requests/lauth.rb::32]]
+*** TODO multiple small writes...a reason why to delay for action on attach [[file:spec/integration/requests/lauth.rb::81]]
+*** TODO match client? or server? [[file:spec/integration/requests/version.rb::20]]
+*** TODO shared secret auth instead of munge [[file:spec/commands/server.spec::9]]
+*** FIXME stop using the Yes backend to test bad users; only [[file:spec/commands/server.spec::51]]
+*** TODO uid=~0 [[file:spec/commands/server.spec::95]]
+*** 87
+
+
+* Reports
+** Test Status
+
+#+NAME spec-proto-op-status
+#+BEGIN_SRC sh :results output raw
+bundle exec sg-rspec-report --style org < doc/spec.json
+#+END_SRC
+
+#+RESULTS:
+| File            | 100%  | Passed         | Pending     |
+|-----------------+-------+----------------+-------------|
+| cat.spec        | false | 89% (8/9)      | 11% (1/9)   |
+| ls.spec         | false | 94% (17/18)    | 6% (1/18)   |
+| put.spec        | false | 94% (15/16)    | 6% (1/16)   |
+| server.spec     | true  | 100% (20/20)   |             |
+| directory-entry | false | 67% (183/273)  | 7% (18/273) |
+| path-entry.spec | false | 82% (156/190)  | 5% (10/190) |
+| async.spec      | true  | 100% (5/5)     |             |
+| bit-field.spec  | true  | 100% (101/101) |             |
+| decoder.spec    | true  | 100% (23/23)   |             |
+
+
+** Protocol Caverage
+#+NAME spec-proto-op-status
+#+BEGIN_SRC sh :results output raw
+bundle exec ./scripts/spec-proto-op-status.rb --style org < doc/spec.json
+#+END_SRC
+
+#+RESULTS:
+| File      | 100%  | Passed        | Pending     |
+|-----------+-------+---------------+-------------|
+| Tattach   | false | 67% (12/18)   |             |
+| Tauth     | true  | 100% (1/1)    |             |
+| Tclunk    | false | 89% (24/27)   |             |
+| Tcreate   | false |               |             |
+| Tflush    | false |               |             |
+| Tgetattr  | false |               |             |
+| Tlink     | false |               |             |
+| Tlopen    | false | 57% (72/127)  |             |
+| Tmkdir    | false |               |             |
+| Tmknod    | false |               |             |
+| Topen     | false |               |             |
+| Tread     | false | 79% (139/177) | 7% (12/177) |
+| Treaddir  | false |               |             |
+| Treadlink | false |               |             |
+| Tremove   | false |               |             |
+| Trename   | false |               |             |
+| Tsetattr  | false |               |             |
+| Tstat     | false | 94% (15/16)   |             |
+| Tstatfs   | false |               |             |
+| Tsymlink  | false |               |             |
+| Tversion  | false | 60% (3/5)     |             |
+| Twalk     | false | 91% (30/33)   | 9% (3/33)   |
+| Twrite    | false | 89% (32/36)   | 11% (4/36)  |
+| Twstat    | false |               |             |
+| unknown   | false | 93% (200/215) | 6% (12/215) |
+
