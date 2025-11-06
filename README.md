@@ -1,19 +1,19 @@
 # NonoP
 
 Copyright © 2025 Nolan Eakins dba SemanticGap™.
-Licensed under the terms in the [COPYING](file.COPYING.html) file.
+Licensed under the terms in the [COPYING](COPYING) file.
 All trademark and other rights reserved.
-[doc/protocol.md](file.protocol.html) subject to [diod](https://github.com/chaos/diod)'s license.
+[doc/protocol.md](doc/protocol.md) subject to [diod](https://github.com/chaos/diod)'s license.
 
 
 # Intro
 
-NonoP provides a server and client commands and API tobise the 9p2000 file sharing protocol. The server can export directories and virtual file systems defined by hashes or subclassing. The client commands perform CRUD and other 9p operations. All this and more can be used directly via the API.
+NonoP provides a server and client commands and API to use the [9p2000](https://9fans.github.io/plan9port/man/man9/intro.html) file sharing protocol. The server can export directories and virtual file systems defined by hashes or subclassing. The client commands perform CRUD and other 9p operations. All the commands' functions and more can be used directly via the API.
 
 Attention
 : This is still more a proof of concept. Writing, xattr, locks, and features beyond basic reading likely won't work or at worst appear to work but drop bytes. There's enough support for a mostly read-only file system that can be mounted by Linux and Diod's 9p drivers.
 :
-: See [doc/reports.org](file.reports.html)
+: See [doc/reports.md](doc/reports.md)
 
 # Installation
 
@@ -62,7 +62,7 @@ The commands are ran with the `nonop` script. Running `nonop help` will show a l
 : Upload stdin to a location.
 
 `cat -e export paths...`
-: Read data from a location ho stdout.
+: Read data from a location to stdout.
 
 `mkdir -e export paths...`
 : Create a new directory at each path.
@@ -97,15 +97,15 @@ Common options include:
 {NonoP::Client}
 : The client API.
 
-[spec/integration/client]()
+[spec/integration/client](spec/integration/client)
 : Test suite of all the client can do.
 
 ### Hash Defined
 
-[examples/basic-fs.nonofs](file.basic-fs.html)
+[examples/basic-fs.nonofs](examples/basic-fs.nonofs)
 : Exports a couple virtual files.
 
-[spec/spec-fs.nonofs](file.spec-fs.html)
+[spec/spec-fs.nonofs](spec/spec-fs.nonofs)
 : Exports at least one of each predefined entry types for testing.
 
 ### Interfaces
