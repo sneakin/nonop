@@ -3,12 +3,12 @@
 ## Test Status
 
 |      File       |      100%       |     Passed      |     Pending     |
-|-----------------+-----------------+-----------------+-----------------|
+|-----------------|-----------------|-----------------|-----------------|
 | cat.spec        | false           |  89% (8/9)      |  11% (1/9)      |
 | ls.spec         | false           |  94% (17/18)    |   6% (1/18)     |
 | put.spec        | false           |  94% (15/16)    |   6% (1/16)     |
 | server.spec     | true            | 100% (20/20)    |                 |
-| directory-entry | false           |  67% (183/273)  |   7% (18/273)   |
+| directory-entry | false           |  72% (256/357)  |   6% (20/357)   |
 | path-entry.spec | false           |  82% (156/190)  |   5% (10/190)   |
 | async.spec      | true            | 100% (5/5)      |                 |
 | bit-field.spec  | true            | 100% (101/101)  |                 |
@@ -20,7 +20,7 @@
 ### Client API
 
 |      File       |      100%       |     Passed      |     Pending     |
-|-----------------+-----------------+-----------------+-----------------|
+|-----------------|-----------------|-----------------|-----------------|
 | Tattach         | false           |  67% (12/18)    |                 |
 | Tauth           | true            | 100% (1/1)      |                 |
 | Tclunk          | false           |  89% (24/27)    |                 |
@@ -33,17 +33,17 @@
 | Tmknod          | false           |                 |                 |
 | Topen           | false           |                 |                 |
 | Tread           | false           |  58% (34/59)    |  20% (12/59)    |
-| Treaddir        | false           |  89% (105/118)  |                 |
+| Treaddir        | false           |  88% (155/177)  |                 |
 | Treadlink       | false           |                 |                 |
 | Tremove         | false           |                 |                 |
 | Trename         | false           |                 |                 |
 | Tsetattr        | false           |                 |                 |
 | Tstat           | false           |                 |                 |
-| Tstatfs         | false           |  94% (15/16)    |                 |
+| Tstatfs         | false           |  96% (23/24)    |                 |
 | Tsymlink        | false           |                 |                 |
 | Tversion        | false           |  60% (3/5)      |                 |
 | Twalk           | false           |  91% (30/33)    |   9% (3/33)     |
-| Twrite          | false           |  89% (32/36)    |  11% (4/36)     |
+| Twrite          | false           |  89% (47/53)    |  11% (6/53)     |
 | Twstat          | false           |                 |                 |
 | unknown         | false           |  93% (200/215)  |   6% (12/215)   |
 
@@ -51,7 +51,7 @@
 ### Manual requests
 
 |      File       |      100%       |     Passed      |     Pending     |
-|-----------------+-----------------+-----------------+-----------------|
+|-----------------|-----------------|-----------------|-----------------|
 | Tattach         | false           |  71% (15/21)    |                 |
 | Tauth           | false           |                 |                 |
 | Tclunk          | false           |  91% (30/33)    |                 |

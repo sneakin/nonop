@@ -31,9 +31,9 @@ file 'doc/reports.md' => [ 'doc/spec.json', 'doc/spec-requests.json' ] do |t|
   require 'async'
   require 'erb'
   Async do
-    specs = Async { IO.popen("sg-rspec-report --style org < doc/spec.json", &:read) }
-    proto_client = Async { IO.popen("sg-rspec-report -f scripts/spec-proto-op-status.rb --style org < doc/spec.json", &:read) }
-    proto_reqs = Async { IO.popen("sg-rspec-report -f scripts/spec-proto-op-status.rb --style org < doc/spec-requests.json", &:read) }
+    specs = Async { IO.popen("sg-rspec-report --style markdown < doc/spec.json", &:read) }
+    proto_client = Async { IO.popen("sg-rspec-report -f scripts/spec-proto-op-status.rb --style markdown < doc/spec.json", &:read) }
+    proto_reqs = Async { IO.popen("sg-rspec-report -f scripts/spec-proto-op-status.rb --style markdown < doc/spec-requests.json", &:read) }
     File.open(t.name, 'w') do |f|
       f.write(ERB.new(File.read('doc/reports.md.erb'), trim_mode: '-').
               result_with_hash(specs: specs.wait,
